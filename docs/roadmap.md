@@ -76,10 +76,12 @@ Alle drei wären ohne Tests gegen die echte Anwendung unentdeckt geblieben.
 - `scripts/ingest-e2e.mjs`: Storage → Trigger → Worker → Voyage → Chunks →
   Realtime gegen den laufenden Stack
 
+- Playwright-Abdeckung für den Quellen-Weg: Anlegen, abgelehnte Adresse,
+  Löschen mit Rückfrage
+
 **Offen:**
 
 - Command-Palette (⌘K), aus Phase 1 verschoben
-- Playwright-Abdeckung für den Upload-Weg
 
 **Vier Fehler, die diese Phase aufgedeckt hat**
 
