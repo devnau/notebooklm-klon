@@ -50,7 +50,13 @@ export default defineConfig({
   ],
 
   webServer: {
-    command: 'npm run dev --workspace=@nlm/web',
+    /*
+     * @nlm/shared wird über das exports-Feld aus dist/ geladen. In einem
+     * frischen Checkout existiert dist/ nicht, und der Dev-Server bricht beim
+     * ersten Import ab — lokal fällt das nicht auf, weil dist/ dort meist schon
+     * liegt. Genau daran ist der E2E-Job in der CI gescheitert.
+     */
+    command: 'npm run build --workspace=@nlm/shared && npm run dev --workspace=@nlm/web',
     url: 'http://localhost:3000/anmelden',
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,

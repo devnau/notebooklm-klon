@@ -28,7 +28,11 @@
     "db:reset": "docker compose down -v && docker compose up -d --wait",
     "smoke": "node scripts/smoke-test.mjs",
     "test:e2e": "playwright test",
-    "test:e2e:ui": "playwright test --ui"
+    "test:e2e:ui": "playwright test --ui",
+    "predev": "npm run build --workspace=@nlm/shared",
+    "pretest": "npm run build --workspace=@nlm/shared",
+    "pretest:e2e": "npm run build --workspace=@nlm/shared",
+    "verify:fresh": "bash scripts/verify-fresh-checkout.sh"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.12.1",

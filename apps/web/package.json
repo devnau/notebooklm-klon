@@ -3,7 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "predev": "npm --prefix ../.. run build --workspace=@nlm/shared",
     "dev": "dotenv -e ../../.env -- next dev",
+    "prebuild": "npm --prefix ../.. run build --workspace=@nlm/shared",
     "build": "dotenv -e ../../.env -- next build",
     "start": "dotenv -e ../../.env -- next start",
     "clean": "rm -rf .next dist *.tsbuildinfo"

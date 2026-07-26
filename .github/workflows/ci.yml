@@ -57,6 +57,13 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
       - run: npm ci
+      # Prueft, dass beide Einstiegspunkte aus dem frischen Zustand bauen —
+      # @nlm/shared wird ueber exports aus dist/ geladen und muss vorher
+      # erzeugt werden.
+      - run: npm run verify:fresh
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: http://localhost:8000
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: build-time-placeholder
       - run: npm run build
         env:
           # Build-Zeit-Platzhalter: die App darf zur Build-Zeit keine echten
@@ -123,6 +130,10 @@ jobs:
 
       - name: Browser installieren
         run: npx playwright install chromium --with-deps
+
+      # Baut @nlm/shared, bevor der Dev-Server startet. Ohne diesen Schritt
+      # fehlt dist/ und jeder Import aus dem Paket schlaegt fehl.
+      - run: npm run build --workspace=@nlm/shared
 
       - run: npx playwright test
 
