@@ -88,20 +88,18 @@ async function main() {
   client.realtime.setAuth(session.access_token);
 
   const seenStatuses = [];
-  const channel = client
-    .channel(`e2e:${notebookId}`)
-    .on(
-      'postgres_changes',
-      {
-        event: '*',
-        schema: 'public',
-        table: 'sources',
-        filter: `notebook_id=eq.${notebookId}`,
-      },
-      (payload) => {
-        if (payload.new?.status) seenStatuses.push(payload.new.status);
-      },
-    );
+  const channel = client.channel(`e2e:${notebookId}`).on(
+    'postgres_changes',
+    {
+      event: '*',
+      schema: 'public',
+      table: 'sources',
+      filter: `notebook_id=eq.${notebookId}`,
+    },
+    (payload) => {
+      if (payload.new?.status) seenStatuses.push(payload.new.status);
+    },
+  );
 
   await new Promise((resolve, reject) => {
     const timer = setTimeout(() => {

@@ -56,6 +56,7 @@ regexes = [
   # freigegeben und nicht die ganze Datei: ein echter Schlüssel, der dort
   # hineingerät, soll weiterhin gefunden werden.
   '''smoke-test-passwort-2026''',
+  '''ingest-e2e-passwort-1234''',
   # Beispiel-Passwörter in der Dokumentation
   '''your-super-secret''',
 ]
