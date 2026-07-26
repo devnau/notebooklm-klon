@@ -7,7 +7,7 @@ Phase ist jeder Commit für sich lauffähig.
 | ----- | -------------------------------------------------------- | -------- | --------- |
 | 0     | Monorepo, Docker-Stack, Datenmodell, CI, Dokumentation   | `v0.1.0` | ✅ fertig |
 | 1     | Auth, Notebook-Verwaltung, App-Shell                     | `v0.2.0` | ✅ fertig |
-| 2     | Quellen-Import: Upload, Extraktion, Chunking, Embeddings | `v0.3.0` | –         |
+| 2     | Quellen-Import: Upload, Extraktion, Chunking, Embeddings | `v0.3.0` | 🔨 läuft  |
 | 3     | Chat mit hybrider Suche und klickbaren Zitaten           | `v0.4.0` | –         |
 | 4     | Notizen und Studio-Artefakte                             | `v0.5.0` | –         |
 | 5     | Audio-Überblick                                          | `v0.6.0` | –         |
@@ -51,15 +51,35 @@ Grafiken; die UI arbeitet bis dahin mit maßgleichen Platzhaltern.
 
 Alle drei wären ohne Tests gegen die echte Anwendung unentdeckt geblieben.
 
-## Phase 2 — Quellen-Import
+## Phase 2 — Quellen-Import 🔨
 
-- Upload per Drag & Drop, Mehrfachauswahl, Fortschritt
-- URL-Import mit SSRF-Schutz, Einfügen von Text
-- `jobs`-Tabelle und Worker mit `SKIP LOCKED`
-- Extraktion: PDF (seitenweise), DOCX, HTML, Markdown, Text
-- Überschriftenbewusstes Chunking mit Überlappung
-- Voyage-Embeddings in Stapeln, mit Backoff
-- Live-Status über Realtime, Quellen-Viewer mit Sprungmarken
+**Fertig:**
+
+- Schema für `sources`, `chunks` (pgvector/HNSW + tsvector/GIN) und `jobs`
+- `claim_job()` mit `FOR UPDATE SKIP LOCKED`, gegengeprüft mit zehn
+  gleichzeitigen Workern; `requeue_stale_jobs()` mit Backoff
+- SSRF-Schutz in zwei Stufen: Namensprüfung ohne DNS, dann Prüfung jeder
+  aufgelösten Adresse und jeder Weiterleitung
+- Upload-Prüfung über Magic Bytes statt `Content-Type`, kein SVG,
+  Zip-Bomben-Erkennung
+- Überschriftenbewusster Chunker mit exakten Zeichenoffsets, Seitenzahlen und
+  Überlappung
+- Extraktoren für PDF (seitenweise), DOCX, HTML (Readability), Text und Markdown
+- 120 Unit-Tests, davon 57 zum SSRF-Schutz und 22 gegen echte Dateien
+
+**Offen:**
+
+- Worker-Prozess: Job-Schleife, Statusübergänge, Fehlerbehandlung
+- Voyage-Client für Embeddings, in Stapeln mit Backoff
+- Upload-UI mit Drag & Drop und Live-Status über Realtime
+- Quellen-Viewer mit Sprungmarken
+- Command-Palette (⌘K), aus Phase 1 verschoben
+
+**Ein Fehler, den diese Phase aufgedeckt hat:** ein Abschnitt konnte eine
+Seitengrenze überspannen und bekam die Seitenzahl seines Anfangs — die
+Hervorhebung hätte über einen Seitenumbruch hinweg markiert, während das Zitat
+auf eine Seite zeigt. Aufgefallen erst im Zusammenspiel von Extraktor und
+Chunker, nicht in den Tests der Einzelteile.
 
 ## Phase 3 — Chat und Zitate
 

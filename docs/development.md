@@ -50,7 +50,7 @@ npm workspaces, drei Pakete:
 | --------------------------------- | -------------------------------------------------------------------- |
 | `packages/shared` (`@nlm/shared`) | Typen, Zod-Schemas, Konstanten, Prompts — von App und Worker genutzt |
 | `apps/web` (`@nlm/web`)           | Next.js                                                              |
-| `apps/worker` (`@nlm/worker`)     | Job-Worker (ab Phase 2)                                              |
+| `apps/worker` (`@nlm/worker`)     | Job-Worker: Import, Artefakte, Audio                                 |
 
 ### Die tsconfig-Struktur
 
