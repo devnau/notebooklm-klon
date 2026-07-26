@@ -12,10 +12,6 @@
     {
       "files": "*.md",
       "options": { "proseWrap": "preserve" }
-    },
-    {
-      "files": "*.sql",
-      "options": { "keywordCase": "lower" }
     }
   ]
 }
