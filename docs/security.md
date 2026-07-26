@@ -111,6 +111,9 @@ Standardweg zur Rechteausweitung in Postgres.
 
 Regeln:
 
+- Das Repository ist **privat**. Das ist eine zusätzliche Schicht, keine
+  Absicherung: die Regeln darunter gelten unabhängig davon, weil ein Repo
+  jederzeit versehentlich geöffnet werden kann und die Historie bleibt.
 - Im Repo liegt ausschließlich `.env.example` mit Platzhaltern.
 - Auf dem Server `chmod 600 .env`.
 - Der `service_role`-Key darf niemals in einer `NEXT_PUBLIC_*`-Variable stehen.
