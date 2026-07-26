@@ -23,6 +23,7 @@ export default {
         'worker',
         'ui',
         'security',
+        'e2e',
         'ci',
         'docker',
         'deps',
