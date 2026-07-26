@@ -32,8 +32,15 @@ npm run typecheck      # alle drei tsconfig-Projekte
 npm run lint
 npm run format
 
-node scripts/smoke-test.mjs   # Funktionstest gegen den laufenden Stack
+npm run test:e2e       # Playwright gegen App + echten Stack
+npm run test:e2e:ui    # Playwright mit Oberfläche
+npm run db:types       # Datenbanktypen aus dem laufenden Schema erzeugen
+npm run db:reset       # Datenbank verwerfen und neu aufbauen
+npm run smoke          # Funktionstest gegen den laufenden Stack
 ```
+
+Nach **jeder** Migration `npm run db:types` ausführen — sonst kennt TypeScript
+die neuen Spalten nicht.
 
 ## Aufbau des Monorepos
 

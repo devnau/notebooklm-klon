@@ -6,7 +6,7 @@ Phase ist jeder Commit für sich lauffähig.
 | Phase | Inhalt                                                   | Tag      | Status    |
 | ----- | -------------------------------------------------------- | -------- | --------- |
 | 0     | Monorepo, Docker-Stack, Datenmodell, CI, Dokumentation   | `v0.1.0` | ✅ fertig |
-| 1     | Auth, Notebook-Verwaltung, App-Shell                     | `v0.2.0` | –         |
+| 1     | Auth, Notebook-Verwaltung, App-Shell                     | `v0.2.0` | ✅ fertig |
 | 2     | Quellen-Import: Upload, Extraktion, Chunking, Embeddings | `v0.3.0` | –         |
 | 3     | Chat mit hybrider Suche und klickbaren Zitaten           | `v0.4.0` | –         |
 | 4     | Notizen und Studio-Artefakte                             | `v0.5.0` | –         |
@@ -26,15 +26,30 @@ Phase ist jeder Commit für sich lauffähig.
 - CI: Lint, Typen, Tests, Build, RLS gegen echten Stack, gitleaks, npm audit
 - Dokumentation: Architektur, Datenmodell, Sicherheit, Entwicklung, 7 ADRs
 
-## Phase 1 — Auth und Notebooks
+## Phase 1 — Auth und Notebooks ✅
 
-- Registrierung, Anmeldung, Magic Link, Abmeldung
-- Session-Erneuerung über `@supabase/ssr`-Middleware
-- Notebook-Übersicht, anlegen, umbenennen, löschen
-- Dreispalten-Shell mit verschiebbaren Trennern, Tab-Navigation auf Mobil
-- Theme-Umschalter, Command-Palette (⌘K)
-- RLS-Testsuite für Notebooks und Mitgliedschaften
-- Assets 1–4 aus `assets/PROMPTS.md`
+- Registrierung, Anmeldung, Magic Link, Passwort-Reset, Abmeldung
+- Session-Erneuerung über `@supabase/ssr` im Next-Proxy
+- Notebook-Übersicht, anlegen, umbenennen, löschen mit Bestätigung
+- Profilseite, Theme-Umschalter mit Systemoption
+- Dreispalten-Arbeitsfläche mit verschiebbaren Trennern, Tabs auf Mobil
+- Design-System: Primitive auf Radix, Kontrast per Test abgesichert
+- 24 E2E-Tests (Playwright) inklusive axe-Scans, 21 Unit-Tests
+- Datenbanktypen generiert statt handgeschrieben (`npm run db:types`)
+
+**Nachgezogen:** Command-Palette (⌘K) — sie braucht Quellen und Notizen, um
+etwas zu durchsuchen, und kommt daher in Phase 2. Assets 1–4 warten auf die
+Grafiken; die UI arbeitet bis dahin mit maßgleichen Platzhaltern.
+
+**Drei Fehler, die diese Phase aufgedeckt hat:**
+
+1. Kein Notebook ließ sich löschen — der Trigger gegen das Entfernen des
+   letzten Owners blockierte die Kaskade (Migration 0003).
+2. Die Abmeldung im Dropdown-Menü lief nie los: Radix entfernt den Button beim
+   Schließen, bevor der Browser das Formular abschickt.
+3. Die Farbpalette erreichte 3,99:1 statt der dokumentierten 4,5:1.
+
+Alle drei wären ohne Tests gegen die echte Anwendung unentdeckt geblieben.
 
 ## Phase 2 — Quellen-Import
 

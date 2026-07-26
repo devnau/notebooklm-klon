@@ -5,8 +5,8 @@ Der teuerste denkbare Fehler ist deshalb ein **Datenleck zwischen zwei
 Notebooks** — nicht eine kaputte Schaltfläche. Danach richtet sich, wo hier
 Aufwand liegt.
 
-Stand: Phase 1. Abschnitte, deren Umsetzung in späteren Phasen liegt, sind als
-solche markiert.
+Stand: Phase 1 abgeschlossen. Abschnitte, deren Umsetzung in späteren Phasen
+liegt, sind als solche markiert.
 
 ## Bedrohungsmodell
 
@@ -39,8 +39,25 @@ GoTrue (Supabase Auth) mit E-Mail und Passwort sowie Magic Link.
 - In Produktion `DISABLE_SIGNUP=true`, sobald die gewünschten Nutzer angelegt
   sind, und `MAILER_AUTOCONFIRM=false`.
 
-Die Session liegt in `httpOnly`-Cookies, die die `@supabase/ssr`-Middleware
-setzt und erneuert. Es gibt kein Token im `localStorage`.
+Die Session liegt in `httpOnly`-Cookies, die der Next-Proxy über
+`@supabase/ssr` setzt und erneuert. Es gibt kein Token im `localStorage`.
+
+**Warum `getUser()` und nicht `getSession()`:** `getSession()` liest das Token
+nur aus dem Cookie, ohne die Signatur zu prüfen. Ein selbst gesetztes Cookie mit
+beliebiger Nutzer-ID würde damit als gültige Session gelten. `getUser()` lässt
+den Auth-Server verifizieren. Der Unterschied ist im Code leicht zu übersehen und
+sicherheitsrelevant.
+
+**Aufzählung von Konten:** Anmeldung, Magic Link und Passwort-Reset antworten
+immer gleich, unabhängig davon, ob die Adresse existiert. Andernfalls wären die
+Formulare ein Werkzeug, mit dem sich registrierte Adressen ermitteln lassen. Zwei
+E2E-Tests prüfen das.
+
+**Offene Weiterleitungen:** Das Rücksprungziel aus `?weiter=` und das `next` im
+Bestätigungslink werden serverseitig geprüft — nur anwendungsinterne Pfade,
+keine absoluten und keine protokollrelativen URLs (`//fremde-seite`). Ohne diese
+Prüfung wäre ein Link auf die eigene Domain ein Phishing-Baustein. Ebenfalls
+durch E2E-Tests abgedeckt.
 
 ## Berechtigungsmodell
 
