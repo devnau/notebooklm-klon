@@ -14,6 +14,9 @@ export default tseslint.config(
       '**/test-results/**',
       '**/*.tsbuildinfo',
       'apps/web/next-env.d.ts',
+      // Generiert aus dem DB-Schema — Formatierung und Union-Stil kommen vom
+      // Generator, nicht von uns.
+      'apps/web/src/lib/supabase/types.ts',
     ],
   },
 

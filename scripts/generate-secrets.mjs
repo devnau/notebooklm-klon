@@ -74,6 +74,12 @@ SUPABASE_SERVICE_ROLE_KEY=${serviceRoleKey}
 # ── URLs ─────────────────────────────────────────────────────────────────────
 PUBLIC_GATEWAY_URL=http://localhost:8000
 PUBLIC_APP_URL=http://localhost:3000
+
+# Dieselben Werte noch einmal unter NEXT_PUBLIC_-Namen: nur so nimmt Next.js
+# sie ins Browser-Bundle auf. Der anon-Key ist dafür vorgesehen — er unterliegt
+# vollständig der Row Level Security. Der service_role-Key darf hier NIE stehen.
+NEXT_PUBLIC_SUPABASE_URL=http://localhost:8000
+NEXT_PUBLIC_SUPABASE_ANON_KEY=${anonKey}
 GATEWAY_PORT=8000
 MAILPIT_UI_PORT=8025
 
