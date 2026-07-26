@@ -310,6 +310,33 @@ await check('FORCE RLS gilt auch für den Tabelleneigentümer', () => {
   assert(unforced === '', `Tabellen ohne FORCE RLS: ${unforced}`);
 });
 
+await check('Notebook lässt sich löschen (Kaskade blockiert nicht)', () => {
+  // Diese Prüfung fehlte anfangs — und genau darin lag ein Fehler: der Trigger
+  // gegen das Entfernen des letzten Owners feuerte auch während der Kaskade
+  // beim Löschen des Notebooks und machte Notebooks unlöschbar. Die Prüfung
+  // „letzter Owner kann nicht entfernt werden" war grün, während Löschen
+  // vollständig kaputt war.
+  // Nur die erste Zeile: bei `insert ... returning` gibt psql zusätzlich die
+  // Statuszeile „INSERT 0 1" aus, die sonst in die UUID rutscht.
+  const notebookId =
+    psql(`
+    insert into public.notebooks (title, owner_id)
+    values ('Kaskadenprobe', (select id from auth.users limit 1))
+    returning id
+  `).split('\n')[0] ?? '';
+  assert(/^[0-9a-f-]{36}$/.test(notebookId), `unerwartete ID: "${notebookId}"`);
+  psql(`delete from public.notebooks where id = '${notebookId}'`);
+  const remaining = psql(
+    `select count(*) from public.notebooks where id = '${notebookId}'`,
+  );
+  assert(remaining === '0', 'Notebook wurde nicht gelöscht');
+
+  const orphanMembers = psql(
+    `select count(*) from public.notebook_members where notebook_id = '${notebookId}'`,
+  );
+  assert(orphanMembers === '0', `verwaiste Mitgliedschaften: ${orphanMembers}`);
+});
+
 await check('letzter Owner kann nicht entfernt werden', () => {
   assert(state.notebookId, 'Voraussetzung fehlt: kein Notebook');
   let message = '';
