@@ -7,6 +7,125 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      chunks: {
+        Row: {
+          char_end: number | null;
+          char_start: number | null;
+          content: string;
+          created_at: string;
+          embedding: string | null;
+          heading_path: string | null;
+          id: number;
+          idx: number;
+          notebook_id: string;
+          page: number | null;
+          source_id: string;
+          token_count: number | null;
+          tsv: unknown;
+        };
+        Insert: {
+          char_end?: number | null;
+          char_start?: number | null;
+          content: string;
+          created_at?: string;
+          embedding?: string | null;
+          heading_path?: string | null;
+          id?: never;
+          idx: number;
+          notebook_id: string;
+          page?: number | null;
+          source_id: string;
+          token_count?: number | null;
+          tsv?: unknown;
+        };
+        Update: {
+          char_end?: number | null;
+          char_start?: number | null;
+          content?: string;
+          created_at?: string;
+          embedding?: string | null;
+          heading_path?: string | null;
+          id?: never;
+          idx?: number;
+          notebook_id?: string;
+          page?: number | null;
+          source_id?: string;
+          token_count?: number | null;
+          tsv?: unknown;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'chunks_notebook_id_fkey';
+            columns: ['notebook_id'];
+            isOneToOne: false;
+            referencedRelation: 'notebooks';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'chunks_source_id_fkey';
+            columns: ['source_id'];
+            isOneToOne: false;
+            referencedRelation: 'sources';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      jobs: {
+        Row: {
+          attempts: number;
+          created_at: string;
+          error: string | null;
+          id: number;
+          kind: string;
+          locked_at: string | null;
+          locked_by: string | null;
+          max_attempts: number;
+          notebook_id: string;
+          payload: Json;
+          run_after: string;
+          status: string;
+          updated_at: string;
+        };
+        Insert: {
+          attempts?: number;
+          created_at?: string;
+          error?: string | null;
+          id?: never;
+          kind: string;
+          locked_at?: string | null;
+          locked_by?: string | null;
+          max_attempts?: number;
+          notebook_id: string;
+          payload?: Json;
+          run_after?: string;
+          status?: string;
+          updated_at?: string;
+        };
+        Update: {
+          attempts?: number;
+          created_at?: string;
+          error?: string | null;
+          id?: never;
+          kind?: string;
+          locked_at?: string | null;
+          locked_by?: string | null;
+          max_attempts?: number;
+          notebook_id?: string;
+          payload?: Json;
+          run_after?: string;
+          status?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'jobs_notebook_id_fkey';
+            columns: ['notebook_id'];
+            isOneToOne: false;
+            referencedRelation: 'notebooks';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       notebook_members: {
         Row: {
           created_at: string;
@@ -111,16 +230,97 @@ export type Database = {
         };
         Relationships: [];
       };
+      sources: {
+        Row: {
+          byte_size: number | null;
+          char_count: number | null;
+          created_at: string;
+          created_by: string | null;
+          error: string | null;
+          id: string;
+          key_topics: string[] | null;
+          kind: string;
+          mime_type: string | null;
+          notebook_id: string;
+          page_count: number | null;
+          source_url: string | null;
+          status: string;
+          storage_path: string | null;
+          summary: string | null;
+          title: string;
+          updated_at: string;
+        };
+        Insert: {
+          byte_size?: number | null;
+          char_count?: number | null;
+          created_at?: string;
+          created_by?: string | null;
+          error?: string | null;
+          id?: string;
+          key_topics?: string[] | null;
+          kind: string;
+          mime_type?: string | null;
+          notebook_id: string;
+          page_count?: number | null;
+          source_url?: string | null;
+          status?: string;
+          storage_path?: string | null;
+          summary?: string | null;
+          title: string;
+          updated_at?: string;
+        };
+        Update: {
+          byte_size?: number | null;
+          char_count?: number | null;
+          created_at?: string;
+          created_by?: string | null;
+          error?: string | null;
+          id?: string;
+          key_topics?: string[] | null;
+          kind?: string;
+          mime_type?: string | null;
+          notebook_id?: string;
+          page_count?: number | null;
+          source_url?: string | null;
+          status?: string;
+          storage_path?: string | null;
+          summary?: string | null;
+          title?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'sources_notebook_id_fkey';
+            columns: ['notebook_id'];
+            isOneToOne: false;
+            referencedRelation: 'notebooks';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
     };
     Views: {
       [_ in never]: never;
     };
     Functions: {
+      claim_job: {
+        Args: { worker_id: string };
+        Returns: {
+          attempts: number;
+          job_id: number;
+          kind: string;
+          notebook_id: string;
+          payload: Json;
+        }[];
+      };
       generate_url_token: { Args: { byte_length?: number }; Returns: string };
       is_notebook_member: {
         Args: { min_role?: string; nb: string };
         Returns: boolean;
       };
+      requeue_stale_jobs: { Args: { lease_seconds?: number }; Returns: number };
+      retry_source: { Args: { p_source_id: string }; Returns: undefined };
+      storage_notebook_id: { Args: { object_name: string }; Returns: string };
     };
     Enums: {
       [_ in never]: never;
