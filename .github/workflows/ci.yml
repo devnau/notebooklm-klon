@@ -100,6 +100,48 @@ jobs:
         if: always()
         run: docker compose down -v
 
+  # ── End-to-End ──────────────────────────────────────────────────────────────
+  # Gegen echte App und echten Stack, ohne Mocks. Deckt auch die Fälle ab, die
+  # nur im Zusammenspiel auffallen: der Owner-Trigger, der die Kaskade beim
+  # Löschen blockierte, war weder in Unit- noch in Smoke-Tests sichtbar.
+  e2e:
+    name: End-to-End (Playwright)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+
+      - name: Secrets für den Test-Stack erzeugen
+        run: node scripts/generate-secrets.mjs > .env
+
+      - name: Stack starten
+        run: docker compose up -d --wait --wait-timeout 180
+
+      - name: Browser installieren
+        run: npx playwright install chromium --with-deps
+
+      - run: npx playwright test
+
+      - name: Bericht bei Fehlschlag hochladen
+        if: failure()
+        uses: actions/upload-artifact@v5
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
+
+      - name: Logs bei Fehlschlag
+        if: failure()
+        run: docker compose logs --tail 100
+
+      - name: Stack abbauen
+        if: always()
+        run: docker compose down -v
+
   # ── Sicherheit: Secret-Scan ─────────────────────────────────────────────────
   secrets:
     name: Sicherheit (Secret-Scan)

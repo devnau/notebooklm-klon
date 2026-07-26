@@ -1,0 +1,17 @@
+{
+  // Eigenes Projekt für E2E- und Sicherheitstests: sie laufen nicht im Browser
+  // und nicht im Next.js-Kontext, brauchen aber Typprüfung wie alles andere.
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "types": ["node"],
+    "noEmit": true,
+    "composite": false,
+    "declaration": false,
+    "declarationMap": false,
+    "incremental": false
+  },
+  "include": ["**/*.ts", "../playwright.config.ts"]
+}
