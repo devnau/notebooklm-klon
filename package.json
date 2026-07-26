@@ -20,16 +20,24 @@
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "typecheck": "tsc --build --force && tsc --noEmit -p packages/shared && tsc --noEmit -p apps/web",
+    "typecheck": "tsc --build --force && tsc --noEmit -p packages/shared && tsc --noEmit -p apps/web && tsc --noEmit -p tests",
     "test": "vitest run",
     "test:watch": "vitest",
-    "prepare": "husky"
+    "prepare": "husky",
+    "db:types": "bash scripts/gen-db-types.sh",
+    "db:reset": "docker compose down -v && docker compose up -d --wait",
+    "smoke": "node scripts/smoke-test.mjs",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.12.1",
     "@commitlint/cli": "^21.2.1",
     "@commitlint/config-conventional": "^21.2.0",
     "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.62.0",
     "@types/node": "^26.1.1",
+    "dotenv-cli": "^11.0.0",
     "eslint": "^10.8.0",
     "eslint-config-prettier": "^10.1.8",
     "globals": "^17.8.0",
@@ -54,7 +62,7 @@
       "prettier --write",
       "eslint --fix"
     ],
-    "*.{json,md,yml,yaml,css,sql}": [
+    "*.{json,md,yml,yaml,css}": [
       "prettier --write"
     ]
   }

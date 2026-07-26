@@ -8,3 +8,6 @@ package-lock.json
 *.tsbuildinfo
 apps/web/next-env.d.ts
 volumes/
+
+# Prettier hat keinen SQL-Parser.
+*.sql
