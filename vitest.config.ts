@@ -15,6 +15,16 @@ export default defineConfig({
       },
       {
         test: {
+          name: 'worker',
+          root: './apps/worker',
+          environment: 'node',
+          include: ['src/**/*.{test,spec}.ts', 'tests/**/*.{test,spec}.ts'],
+          // Extraktion echter PDFs und DOCX dauert laenger als ein Unit-Test.
+          testTimeout: 20_000,
+        },
+      },
+      {
+        test: {
           name: 'web',
           root: './apps/web',
           environment: 'node',

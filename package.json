@@ -20,7 +20,7 @@
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "typecheck": "tsc --build --force && tsc --noEmit -p packages/shared && tsc --noEmit -p apps/web && tsc --noEmit -p tests",
+    "typecheck": "tsc --build --force && tsc --noEmit -p packages/shared && tsc --noEmit -p apps/web && tsc --noEmit -p apps/worker && tsc --noEmit -p tests",
     "test": "vitest run",
     "test:watch": "vitest",
     "prepare": "husky",

@@ -264,6 +264,23 @@ export function chunkText(text: string, options: ChunkOptions = {}): Chunk[] {
       continue;
     }
 
+    /*
+     * An Seitengrenzen ebenfalls trennen. Ohne das kann ein Abschnitt über zwei
+     * Seiten reichen und bekommt die Seitenzahl seines Anfangs — die
+     * Hervorhebung im Viewer würde dann über einen Seitenumbruch hinweg
+     * markieren, während das Zitat nur auf eine Seite zeigt. Aufgefallen im
+     * Zusammenspiel mit dem PDF-Extraktor.
+     */
+    if (pending.length > 0 && pageBreaks.length > 0) {
+      const first = pending[0];
+      if (
+        first &&
+        pageForOffset(first.start, pageBreaks) !== pageForOffset(block.start, pageBreaks)
+      ) {
+        flush();
+      }
+    }
+
     if (pending.length === 0) {
       pendingHeadingPath = currentHeadingPath();
     }
