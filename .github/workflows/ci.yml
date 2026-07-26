@@ -29,6 +29,12 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
       - run: npm ci
+      # ESLint laeuft mit Typinformation. Ohne gebautes @nlm/shared zeigen dessen
+      # Exporte auf nicht vorhandene .d.ts-Dateien, und jede Verwendung wird zu
+      # "unsafe assignment of an error typed value" — dutzende Fehler, die mit
+      # dem Code nichts zu tun haben. Lokal faellt das nicht auf, weil dist/
+      # vom letzten Lauf noch da liegt.
+      - run: npm run build --workspace=@nlm/shared
       - run: npm run format:check
       - run: npm run lint
       - run: npm run typecheck
