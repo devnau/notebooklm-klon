@@ -65,21 +65,44 @@ Alle drei wären ohne Tests gegen die echte Anwendung unentdeckt geblieben.
 - Überschriftenbewusster Chunker mit exakten Zeichenoffsets, Seitenzahlen und
   Überlappung
 - Extraktoren für PDF (seitenweise), DOCX, HTML (Readability), Text und Markdown
-- 120 Unit-Tests, davon 57 zum SSRF-Schutz und 22 gegen echte Dateien
+- Worker-Prozess: Job-Schleife, Statusübergänge, Fehlerbehandlung, sauberes
+  Beenden auf SIGTERM
+- Voyage-Client für Embeddings, in Stapeln mit Backoff und Jitter
+- Private Storage-Buckets; der Job zum Import hängt am Insert der Quelle
+- Upload-UI mit Drag & Drop, Adress- und Text-Import, Live-Status über Realtime
+- Quellen-Viewer mit exakten Zitatankern
+- Realtime-Dienst im Stack
+- 145 Unit-Tests, davon 57 zum SSRF-Schutz und 22 gegen echte Dateien
+- `scripts/ingest-e2e.mjs`: Storage → Trigger → Worker → Voyage → Chunks →
+  Realtime gegen den laufenden Stack
 
 **Offen:**
 
-- Worker-Prozess: Job-Schleife, Statusübergänge, Fehlerbehandlung
-- Voyage-Client für Embeddings, in Stapeln mit Backoff
-- Upload-UI mit Drag & Drop und Live-Status über Realtime
-- Quellen-Viewer mit Sprungmarken
 - Command-Palette (⌘K), aus Phase 1 verschoben
+- Playwright-Abdeckung für den Upload-Weg
 
-**Ein Fehler, den diese Phase aufgedeckt hat:** ein Abschnitt konnte eine
-Seitengrenze überspannen und bekam die Seitenzahl seines Anfangs — die
-Hervorhebung hätte über einen Seitenumbruch hinweg markiert, während das Zitat
-auf eine Seite zeigt. Aufgefallen erst im Zusammenspiel von Extraktor und
-Chunker, nicht in den Tests der Einzelteile.
+**Vier Fehler, die diese Phase aufgedeckt hat**
+
+1. **Abschnitt über eine Seitengrenze.** Er bekam die Seitenzahl seines Anfangs
+   — die Hervorhebung hätte über einen Seitenumbruch hinweg markiert, während
+   das Zitat auf eine Seite zeigt. Aufgefallen erst im Zusammenspiel von
+   Extraktor und Chunker, nicht in den Tests der Einzelteile.
+2. **Zitatanker sassen daneben.** Der Chunker setzte den Inhalt aus Blöcken
+   zusammen und trimmte ihn, liess die Zeichengrenzen aber ungetrimmt;
+   `text.slice(charStart, charEnd)` ergab damit nicht `content`. Antwort und
+   Verweis hätten gestimmt, nur die Markierung wäre verrutscht — niemand hätte
+   es als Fehler gemeldet, man hätte der Anwendung nur weniger geglaubt.
+   Inhalte werden jetzt aus dem Originaltext geschnitten; sechs Tests halten
+   die Zusicherung fest. Gefunden von der Ende-zu-Ende-Probe, nicht von einem
+   Unit-Test.
+3. **Realtime gab es gar nicht.** Die Quellenliste abonnierte Statusänderungen,
+   aber kein Container hörte zu. Die Oberfläche wäre stehengeblieben, bis
+   jemand neu lädt — und nach dem Reload stimmt der Zustand ja, also wäre es
+   beim Klicken nicht aufgefallen.
+4. **Der Stack startete nicht frisch.** Die Bucket-Migration lief vor dem
+   Storage-Dienst, der `storage.buckets` erst selbst anlegt. Lokal nie
+   sichtbar, weil das Volume schon bestand — genau der Fehler, den der erste
+   Fremde beim ersten `docker compose up` trifft.
 
 ## Phase 3 — Chat und Zitate
 
