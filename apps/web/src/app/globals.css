@@ -125,6 +125,8 @@
   --animate-slide-up: slide-up 200ms var(--ease-out-quart);
   --animate-shimmer: shimmer 1.8s ease-in-out infinite;
   --animate-caret: caret 1s steps(2) infinite;
+  /* Unbestimmter Fortschritt — für Vorgänge ohne meldbaren Anteil (Uploads). */
+  --animate-indeterminate: indeterminate 1.4s ease-in-out infinite;
 }
 
 .dark {
@@ -202,6 +204,15 @@
   }
   50% {
     opacity: 0;
+  }
+}
+
+@keyframes indeterminate {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(400%);
   }
 }
 

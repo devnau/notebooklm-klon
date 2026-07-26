@@ -22,16 +22,30 @@ const schema = z.object({
 
 export type WorkerConfig = z.infer<typeof schema>;
 
+/**
+ * Leere Werte wie nicht gesetzte behandeln.
+ *
+ * `.env`-Dateien enthalten typischerweise Zeilen wie `ANTHROPIC_API_KEY=` als
+ * Platzhalter. Ohne diese Umwandlung wäre das ein *gesetzter* leerer String,
+ * und eine als optional gedachte Variable scheiterte an der Mindestlänge — mit
+ * einer Fehlermeldung, die einen Schlüssel verlangt, der gar nicht nötig ist.
+ */
+function blankToUndefined(value: string | undefined): string | undefined {
+  return value?.trim() ? value : undefined;
+}
+
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): WorkerConfig {
   const parsed = schema.safeParse({
     // Der Worker läuft im Docker-Netz und spricht das Gateway intern an, nicht
     // über die öffentliche Adresse.
-    SUPABASE_URL: env.SUPABASE_INTERNAL_URL ?? env.NEXT_PUBLIC_SUPABASE_URL,
-    SUPABASE_SERVICE_ROLE_KEY: env.SUPABASE_SERVICE_ROLE_KEY,
-    VOYAGE_API_KEY: env.VOYAGE_API_KEY,
-    ANTHROPIC_API_KEY: env.ANTHROPIC_API_KEY,
-    LOG_LEVEL: env.LOG_LEVEL,
-    WORKER_ID: env.WORKER_ID,
+    SUPABASE_URL: blankToUndefined(
+      env.SUPABASE_INTERNAL_URL ?? env.NEXT_PUBLIC_SUPABASE_URL,
+    ),
+    SUPABASE_SERVICE_ROLE_KEY: blankToUndefined(env.SUPABASE_SERVICE_ROLE_KEY),
+    VOYAGE_API_KEY: blankToUndefined(env.VOYAGE_API_KEY),
+    ANTHROPIC_API_KEY: blankToUndefined(env.ANTHROPIC_API_KEY),
+    LOG_LEVEL: blankToUndefined(env.LOG_LEVEL),
+    WORKER_ID: blankToUndefined(env.WORKER_ID),
   });
 
   if (!parsed.success) {

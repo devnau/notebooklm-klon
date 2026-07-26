@@ -2,6 +2,7 @@ import {
   BUCKET_SOURCES,
   chunkText,
   checkCompressionRatio,
+  checkUpload,
   type SourceKind,
 } from '@nlm/shared';
 import type { SupabaseClient } from '@supabase/supabase-js';
@@ -182,6 +183,39 @@ async function loadAndExtract(source: SourceRow, supabase: SupabaseClient, log: 
 
   const bytes = new Uint8Array(await data.arrayBuffer());
 
+  /*
+   * Die verbindliche Typprüfung. Der Browser prüft vor dem Upload dieselbe
+   * Funktion, aber das ist reine Höflichkeit gegenüber dem Nutzer — wer die
+   * Oberfläche umgeht und direkt gegen die Storage-API spricht, kommt daran
+   * vorbei. Hier nicht: geprüft werden die Bytes, die tatsächlich im Bucket
+   * liegen, und zwar bevor sie an einen Parser gehen.
+   *
+   * Erst recht wichtig, weil `kind` aus der Datenbank kommt und vom Client
+   * gesetzt wurde: ohne diesen Abgleich könnte jemand eine beliebige Datei als
+   * 'docx' eintragen und damit den ZIP-Parser auf Inhalte loslassen, für die er
+   * nie gedacht war.
+   */
+  const verdict = checkUpload({
+    data: bytes.subarray(0, 8192),
+    declaredName: source.title,
+    declaredMime: undefined,
+    totalBytes: bytes.byteLength,
+  });
+
+  if (!verdict.ok) {
+    throw new ExtractionError(
+      `Upload-Prüfung fehlgeschlagen (${verdict.reason}): ${verdict.detail}`,
+      verdict.detail,
+    );
+  }
+
+  if (verdict.kind !== source.kind && !isTextPair(verdict.kind, source.kind)) {
+    throw new ExtractionError(
+      `Inhalt ist ${verdict.kind}, eingetragen war ${source.kind}`,
+      'Der Inhalt der Datei passt nicht zum angegebenen Dateityp.',
+    );
+  }
+
   // Zip-Bombe: bei DOCX das Verhältnis prüfen, bevor entpackt wird.
   if (source.kind === 'docx' && source.byte_size) {
     // mammoth entpackt selbst; als grobe Vorabschätzung dient die Dateigröße
@@ -195,6 +229,19 @@ async function loadAndExtract(source: SourceRow, supabase: SupabaseClient, log: 
   }
 
   return extract(source.kind, { data: bytes });
+}
+
+/**
+ * txt, md und paste sind derselbe Inhalt mit anderem Etikett.
+ *
+ * Die Signaturprüfung kann sie nicht auseinanderhalten — reiner Text hat keine
+ * Magic Bytes —, deshalb wäre eine Abweichung zwischen diesen dreien kein
+ * Hinweis auf einen Angriff, sondern nur auf eine andere Dateiendung.
+ */
+const TEXT_KINDS: ReadonlySet<SourceKind> = new Set(['txt', 'md', 'paste']);
+
+function isTextPair(detected: SourceKind, declared: SourceKind): boolean {
+  return TEXT_KINDS.has(detected) && TEXT_KINDS.has(declared);
 }
 
 async function setStatus(
