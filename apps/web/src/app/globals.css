@@ -24,8 +24,8 @@
   --color-paper-100: oklch(0.975 0.004 85);
   --color-paper-200: oklch(0.94 0.005 85);
   --color-paper-300: oklch(0.89 0.006 82);
-  --color-paper-400: oklch(0.72 0.008 80);
-  --color-paper-500: oklch(0.58 0.009 78);
+  --color-paper-400: oklch(0.66 0.009 79);
+  --color-paper-500: oklch(0.53 0.009 78);
   --color-paper-600: oklch(0.46 0.009 76);
   --color-paper-700: oklch(0.36 0.009 74);
   --color-paper-800: oklch(0.26 0.008 72);
@@ -68,9 +68,13 @@
   --color-foreground: var(--color-paper-900);
   --color-muted: var(--color-paper-200);
   --color-muted-foreground: var(--color-paper-500);
+  /* Dekorative Trennlinien dürfen zart sein. */
   --color-border: var(--color-paper-300);
   --color-border-strong: var(--color-paper-400);
-  --color-input: var(--color-paper-300);
+  /* Ränder von Eingabefeldern nicht: sie sind das einzige Merkmal, an dem ein
+     Feld erkennbar ist, und brauchen darum 3:1 (WCAG 1.4.11). Geprüft in
+     packages/shared/src/color.test.ts. */
+  --color-input: var(--color-paper-400);
   --color-ring: var(--color-teal-500);
 
   --color-primary: var(--color-teal-600);
@@ -133,7 +137,7 @@
   --color-muted-foreground: var(--color-paper-400);
   --color-border: oklch(0.28 0.008 72);
   --color-border-strong: oklch(0.38 0.009 74);
-  --color-input: oklch(0.3 0.008 72);
+  --color-input: oklch(0.51 0.009 74);
   --color-ring: var(--color-teal-400);
 
   --color-primary: var(--color-teal-400);
