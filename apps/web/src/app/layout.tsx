@@ -48,6 +48,9 @@ export default function RootLayout({ children }: { readonly children: ReactNode 
     <html
       lang="de"
       suppressHydrationWarning
+      // Sagt Next.js, dass das weiche Scrollen gewollt ist. Ohne dieses
+      // Attribut warnt der Router und schaltet es bei Routenwechseln ab.
+      data-scroll-behavior="smooth"
       className={`${instrumentSans.variable} ${sourceSerif.variable} ${jetbrainsMono.variable}`}
     >
       <body className="min-h-dvh antialiased">
