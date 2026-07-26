@@ -1,0 +1,131 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# Ein laufender Durchlauf pro Branch reicht; älteren abbrechen.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: '24'
+
+jobs:
+  # ── Statische Prüfungen ─────────────────────────────────────────────────────
+  quality:
+    name: Lint, Typen, Format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - run: npm run format:check
+      - run: npm run lint
+      - run: npm run typecheck
+
+  # ── Unit- und Integrationstests ─────────────────────────────────────────────
+  test:
+    name: Unit-Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - run: npm test
+
+  # ── Build ───────────────────────────────────────────────────────────────────
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+        env:
+          # Build-Zeit-Platzhalter: die App darf zur Build-Zeit keine echten
+          # Secrets brauchen. Tut sie es doch, schlägt dieser Job fehl — und
+          # genau das ist gewollt.
+          NEXT_PUBLIC_SUPABASE_URL: http://localhost:8000
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: build-time-placeholder
+
+  # ── Sicherheit: RLS und Datenbank-Policies ──────────────────────────────────
+  # Läuft gegen einen echten Stack. Dieser Job ist blockierend: eine Lücke im
+  # Berechtigungsmodell ist der teuerste Fehler, den diese Anwendung machen kann.
+  security-db:
+    name: Sicherheit (RLS gegen echten Stack)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+
+      - name: Secrets für den Test-Stack erzeugen
+        run: node scripts/generate-secrets.mjs > .env
+
+      - name: Stack starten
+        run: docker compose up -d --wait --wait-timeout 180
+
+      - name: Container-Status bei Fehlschlag zeigen
+        if: failure()
+        run: docker compose ps && docker compose logs --tail 60
+
+      - name: Funktionstest des Stacks
+        run: node scripts/smoke-test.mjs
+
+      - name: Logs bei Fehlschlag
+        if: failure()
+        run: docker compose logs --tail 100
+
+      - name: Stack abbauen
+        if: always()
+        run: docker compose down -v
+
+  # ── Sicherheit: Secret-Scan ─────────────────────────────────────────────────
+  secrets:
+    name: Sicherheit (Secret-Scan)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          # gitleaks braucht die vollständige Historie, um auch alte Commits
+          # zu prüfen — ein einmal committeter Key bleibt sonst unentdeckt.
+          fetch-depth: 0
+      - name: gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITLEAKS_CONFIG: .gitleaks.toml
+
+  # ── Sicherheit: Abhängigkeiten ──────────────────────────────────────────────
+  audit:
+    name: Sicherheit (Abhängigkeiten)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      # High und Critical blockieren. Moderate werden gemeldet, aber nicht
+      # blockierend — sonst blockiert ein transitiver Fund ohne Fix jeden PR.
+      - run: npm audit --audit-level=high
