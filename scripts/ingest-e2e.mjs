@@ -202,6 +202,42 @@ async function main() {
   console.log('  ✓ Job abgeschlossen');
 
   /*
+   * Der Volltext ist die Grundlage des Viewers und damit jedes Zitats. Fehlt
+   * er, fällt das erst auf, wenn jemand im Chat auf einen Verweis klickt — also
+   * genau an der Stelle, an der die Anwendung Vertrauen gewinnen oder verlieren
+   * soll.
+   */
+  const textPath = psql(`select text_path from public.sources where id = '${sourceId}';`);
+  if (!textPath) throw new Error('Kein text_path gesetzt');
+
+  const textUrl = `${GATEWAY}/storage/v1/object/sources/${textPath}`;
+  const textResponse = await fetch(textUrl, {
+    headers: { Authorization: `Bearer ${SERVICE}`, apikey: SERVICE },
+  });
+  if (!textResponse.ok) throw new Error(`Volltext nicht abrufbar: ${textResponse.status}`);
+  const fullText = await textResponse.text();
+  if (fullText.length === 0) throw new Error('Volltext ist leer');
+
+  /*
+   * Der eigentliche Prüfpunkt für den Viewer: die Zeichenpositionen eines
+   * Abschnitts müssen im Volltext tatsächlich denselben Text treffen. Wäre der
+   * Text irgendwo anders normalisiert worden als beim Zerlegen, säße jede
+   * Markierung ein paar Zeichen daneben — sichtbar erst beim Klicken, und dann
+   * als Vertrauensverlust.
+   */
+  const [charStart, charEnd, expected] = psql(`
+    select char_start, char_end, content
+    from public.chunks where source_id = '${sourceId}' order by idx limit 1;
+  `).split('|');
+  const actual = fullText.slice(Number(charStart), Number(charEnd));
+  if (actual !== expected) {
+    throw new Error(
+      `Zitatanker trifft daneben (${charStart}–${charEnd}).\n  erwartet (${expected.length}): ${JSON.stringify(expected)}\n  gefunden (${actual.length}): ${JSON.stringify(actual)}`,
+    );
+  }
+  console.log(`  ✓ Volltext (${fullText.length} Zeichen), Zitatanker trifft exakt`);
+
+  /*
    * Der Grund, warum die Oberfläche ohne Polling auskommt. Ein leeres
    * seenStatuses hieße: die Quellenliste bliebe stehen, bis der Nutzer die
    * Seite neu lädt — und niemand würde es beim Klicken merken, weil der
@@ -220,10 +256,12 @@ async function main() {
   console.log('→ Aufräumen ...');
   psql(`delete from public.notebooks where id = '${notebookId}';`);
   psql(`delete from auth.users where id = '${userId}';`);
-  await fetch(`${GATEWAY}/storage/v1/object/sources/${storagePath}`, {
-    method: 'DELETE',
-    headers: { Authorization: `Bearer ${SERVICE}`, apikey: SERVICE },
-  });
+  for (const path of [storagePath, textPath]) {
+    await fetch(`${GATEWAY}/storage/v1/object/sources/${path}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${SERVICE}`, apikey: SERVICE },
+    });
+  }
 
   console.log('\n✓ Ingestion funktioniert Ende zu Ende.');
 }

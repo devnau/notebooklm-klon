@@ -97,6 +97,31 @@ export async function ingestSource(
 
     log.info({ chunks: chunks.length }, 'Abschnitte gebildet, Embeddings folgen');
 
+    /*
+     * Den extrahierten Text sichern, bevor eingebettet wird. Er ist die
+     * Grundlage des Viewers: Zitate zeigen über char_start/char_end auf
+     * Positionen im *ganzen* Dokument, und aus den überlappenden Abschnitten
+     * ließe sich das Original nur ungefähr wieder zusammensetzen — die
+     * markierte Stelle säße dann ein paar Zeichen daneben.
+     *
+     * Bewusst vor dem Embedding: schlägt Voyage fehl, ist der Text trotzdem
+     * schon da, und ein erneuter Versuch beginnt nicht wieder beim Parsen.
+     */
+    const textPath = `${source.notebook_id}/extrahiert/${source.id}.md`;
+    const { error: textError } = await supabase.storage
+      .from(BUCKET_SOURCES)
+      .upload(textPath, new TextEncoder().encode(markdown), {
+        // Ohne charset-Parameter: der Bucket vergleicht den Content-Type als
+        // ganze Zeichenkette gegen seine Positivliste, ein angehängtes
+        // "; charset=utf-8" gilt dort als anderer Typ und wird abgewiesen.
+        contentType: 'text/markdown',
+        // Beim zweiten Anlauf liegt die Datei schon da.
+        upsert: true,
+      });
+    if (textError) {
+      throw new Error(`Volltext nicht speicherbar: ${textError.message}`);
+    }
+
     const { vectors, totalTokens } = await embeddings.embed(
       chunks.map((chunk) => chunk.content),
       'document',
@@ -135,7 +160,7 @@ export async function ingestSource(
       }
     }
 
-    await setStatus(supabase, source.id, 'ready', { error: null });
+    await setStatus(supabase, source.id, 'ready', { error: null, text_path: textPath });
 
     log.info(
       { chunks: chunks.length, tokens: totalTokens },

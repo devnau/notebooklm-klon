@@ -247,6 +247,7 @@ export type Database = {
           status: string;
           storage_path: string | null;
           summary: string | null;
+          text_path: string | null;
           title: string;
           updated_at: string;
         };
@@ -266,6 +267,7 @@ export type Database = {
           status?: string;
           storage_path?: string | null;
           summary?: string | null;
+          text_path?: string | null;
           title: string;
           updated_at?: string;
         };
@@ -285,6 +287,7 @@ export type Database = {
           status?: string;
           storage_path?: string | null;
           summary?: string | null;
+          text_path?: string | null;
           title?: string;
           updated_at?: string;
         };

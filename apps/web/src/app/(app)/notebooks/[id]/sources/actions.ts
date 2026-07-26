@@ -228,7 +228,11 @@ export async function addPasteSource(
 
   const { error: uploadError } = await supabase.storage
     .from(BUCKET_SOURCES)
-    .upload(storagePath, bytes, { contentType: 'text/plain; charset=utf-8' });
+    .upload(storagePath, bytes, {
+      // Ohne charset-Parameter: der Bucket vergleicht den Content-Type als
+      // ganze Zeichenkette gegen seine Positivliste.
+      contentType: 'text/plain',
+    });
 
   if (uploadError) return { error: 'Der Text konnte nicht gespeichert werden.' };
 
@@ -274,7 +278,7 @@ export async function deleteSource(
 
   const { data: source } = await supabase
     .from('sources')
-    .select('storage_path')
+    .select('storage_path, text_path')
     .eq('id', sourceId)
     .maybeSingle();
 
@@ -283,8 +287,13 @@ export async function deleteSource(
 
   // Erst nach dem erfolgreichen Löschen der Zeile: bliebe die Zeile stehen und
   // die Datei wäre weg, zeigte die UI eine Quelle, die nirgends mehr existiert.
-  if (source?.storage_path) {
-    await supabase.storage.from(BUCKET_SOURCES).remove([source.storage_path]);
+  // Beide Dateien — Original und extrahierter Text —, sonst bleibt Müll im
+  // Bucket zurück, den niemand mehr zuordnen kann.
+  const paths = [source?.storage_path, source?.text_path].filter(
+    (path): path is string => typeof path === 'string' && path.length > 0,
+  );
+  if (paths.length > 0) {
+    await supabase.storage.from(BUCKET_SOURCES).remove(paths);
   }
 
   revalidatePath(`/notebooks/${notebookId}`);
@@ -311,13 +320,18 @@ export async function retrySource(
 }
 
 /**
- * Kurzlebige Adresse zum Anzeigen einer Quelle im Viewer.
+ * Kurzlebige Adresse auf den extrahierten Volltext einer Quelle.
  *
- * 60 Sekunden reichen, um die Datei zu laden. Längere Gültigkeit hieße: wer die
- * URL einmal abgreift, kommt auch später noch an das Dokument — ohne dass ein
- * Entzug der Mitgliedschaft daran etwas ändert.
+ * Signierte URL statt Text im Rückgabewert: ein Dokument kann Megabyte groß
+ * sein, und das durch eine Server Action zu schieben hieße, es komplett im
+ * Speicher des Anwendungsservers zu halten, bevor der Browser das erste Zeichen
+ * sieht. So lädt der Browser direkt aus dem Storage.
+ *
+ * 120 Sekunden Gültigkeit. Länger hieße: wer die URL einmal abgreift, kommt
+ * auch später noch an das Dokument — ohne dass ein Entzug der Mitgliedschaft
+ * daran etwas ändert. Kürzer wäre bei langsamer Verbindung zu knapp.
  */
-export async function createSourceViewUrl(
+export async function createSourceTextUrl(
   sourceId: string,
 ): Promise<{ url?: string; error?: string }> {
   if (!uuid.safeParse(sourceId).success) return { error: 'Ungültige Angabe.' };
@@ -326,16 +340,24 @@ export async function createSourceViewUrl(
 
   const { data: source } = await supabase
     .from('sources')
-    .select('storage_path')
+    .select('text_path, status')
     .eq('id', sourceId)
     .maybeSingle();
 
-  if (!source?.storage_path) return { error: 'Zu dieser Quelle gibt es keine Datei.' };
+  if (!source) return { error: 'Diese Quelle gibt es nicht.' };
+  if (!source.text_path) {
+    return {
+      error:
+        source.status === 'ready'
+          ? 'Zu dieser Quelle liegt kein Text vor.'
+          : 'Die Quelle wird noch verarbeitet.',
+    };
+  }
 
   const { data, error } = await supabase.storage
     .from(BUCKET_SOURCES)
-    .createSignedUrl(source.storage_path, 60);
+    .createSignedUrl(source.text_path, 120);
 
-  if (error || !data) return { error: 'Die Datei ließ sich nicht öffnen.' };
+  if (error || !data) return { error: 'Der Text ließ sich nicht öffnen.' };
   return { url: data.signedUrl };
 }

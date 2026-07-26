@@ -11,6 +11,7 @@ import {
   statusAnnouncement,
   type SourceStatus,
 } from '@/components/sources/status-pill';
+import { SourceViewer } from '@/components/sources/source-viewer';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { createClient } from '@/lib/supabase/client';
@@ -187,6 +188,7 @@ function SourceCard({
   const [pending, startTransition] = useTransition();
   const [actionError, setActionError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [viewerOpen, setViewerOpen] = useState(false);
   const Icon = KIND_ICON[source.kind] ?? FileText;
 
   const run = (work: () => Promise<{ error?: string }>) => {
@@ -207,9 +209,27 @@ function SourceCard({
       <div className="flex items-start gap-2.5">
         <Icon className="text-muted-foreground mt-0.5 size-4 shrink-0" aria-hidden />
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-medium" title={source.title}>
-            {source.title}
-          </p>
+          {/*
+            Nur fertige Quellen sind anklickbar. Eine Schaltfläche, die
+            zuverlässig „wird noch verarbeitet" antwortet, ist keine
+            Schaltfläche, sondern eine Einladung zum Frust.
+          */}
+          {source.status === 'ready' ? (
+            <button
+              type="button"
+              onClick={() => {
+                setViewerOpen(true);
+              }}
+              className="focus-visible:ring-ring block max-w-full truncate rounded-sm text-left text-sm font-medium hover:underline focus-visible:ring-2 focus-visible:outline-none"
+              title={source.title}
+            >
+              {source.title}
+            </button>
+          ) : (
+            <p className="truncate text-sm font-medium" title={source.title}>
+              {source.title}
+            </p>
+          )}
           <div className="mt-1.5 flex flex-wrap items-center gap-2">
             <StatusPill status={source.status} />
             {source.status === 'ready' && source.page_count !== null && (
@@ -278,6 +298,20 @@ function SourceCard({
             {confirmDelete ? 'Wirklich löschen?' : 'Löschen'}
           </Button>
         </div>
+      )}
+
+      {/*
+        Der Viewer wird erst gemountet, wenn er gebraucht wird. Bei zwanzig
+        Quellen wären das sonst zwanzig Dialoge im DOM, von denen keiner
+        sichtbar ist.
+      */}
+      {viewerOpen && (
+        <SourceViewer
+          sourceId={source.id}
+          title={source.title}
+          open={viewerOpen}
+          onOpenChange={setViewerOpen}
+        />
       )}
     </li>
   );

@@ -367,3 +367,77 @@ describe('Deutschsprachige Realität', () => {
     }
   });
 });
+
+describe('Zitatanker', () => {
+  /*
+   * Die wichtigste Eigenschaft des Chunkers, und die am leichtesten zu
+   * verlierende: `text.slice(charStart, charEnd)` muss exakt `content`
+   * ergeben. Bricht sie, zeigt jedes Zitat im Viewer ein paar Zeichen daneben —
+   * unauffällig, weil Antwort und Verweis stimmen und nur die Markierung
+   * verrutscht. Genau das war beim ersten Entwurf der Fall: der Inhalt wurde
+   * aus den Blöcken zusammengesetzt und getrimmt, die Grenzen blieben
+   * ungetrimmt.
+   */
+  function assertAnchors(text: string, options?: Parameters<typeof chunkText>[1]) {
+    const chunks = chunkText(text, options);
+    expect(chunks.length).toBeGreaterThan(0);
+    for (const chunk of chunks) {
+      expect(
+        text.slice(chunk.charStart, chunk.charEnd),
+        `Abschnitt ${String(chunk.idx)} (${String(chunk.charStart)}–${String(chunk.charEnd)})`,
+      ).toBe(chunk.content);
+    }
+    return chunks;
+  }
+
+  it('trifft bei einfachem Text', () => {
+    assertAnchors('Erster Absatz.\n\nZweiter Absatz mit etwas mehr Inhalt.\n');
+  });
+
+  it('trifft bei führenden und abschließenden Leerzeilen', () => {
+    assertAnchors('\n\n\nEin Absatz, umgeben von Leerraum.\n\n\n');
+  });
+
+  it('trifft bei Überschriften und mehreren Kapiteln', () => {
+    assertAnchors(
+      [
+        '# Kapitel 1',
+        '',
+        'Text des ersten Kapitels.',
+        '',
+        '## Abschnitt 1.1',
+        '',
+        'Mehr Text.',
+        '',
+        '# Kapitel 2',
+        '',
+        'Text des zweiten Kapitels.',
+      ].join('\n'),
+    );
+  });
+
+  it('trifft auch bei Überlappung zwischen den Abschnitten', () => {
+    // Kleines Ziel erzwingt viele Schnitte und damit den Überlappungspfad.
+    const text = Array.from(
+      { length: 30 },
+      (_, index) =>
+        `Absatz ${String(index)}: Die Verordnung regelt den Umgang mit personenbezogenen Daten.`,
+    ).join('\n\n');
+    const chunks = assertAnchors(text, { targetTokens: 60, overlapTokens: 20 });
+    expect(chunks.length).toBeGreaterThan(3);
+  });
+
+  it('trifft auch nach dem Zusammenlegen kurzer Abschnitte', () => {
+    // minChars hoch ansetzen, damit der Merge-Pfad sicher durchlaufen wird.
+    assertAnchors('Kurz.\n\nAuch kurz.\n\nEbenfalls kurz.\n\nUnd noch einer.', {
+      targetTokens: 5,
+      minChars: 400,
+    });
+  });
+
+  it('trifft bei mehreren Leerzeilen zwischen Absätzen', () => {
+    // Der Fall, an dem ein Zusammensetzen mit '\n\n' scheitern muss: im
+    // Original stehen drei Leerzeilen, in der Rekonstruktion eine.
+    assertAnchors('Erster Absatz.\n\n\n\n\nZweiter Absatz.', { targetTokens: 500 });
+  });
+});

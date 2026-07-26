@@ -232,22 +232,40 @@ export function chunkText(text: string, options: ChunkOptions = {}): Chunk[] {
     const last = pending[pending.length - 1];
     if (!first || !last) return;
 
-    const content = pending
-      .map((block) => block.text)
-      .join('\n\n')
-      .trim();
+    /*
+     * Der Inhalt wird aus dem Originaltext geschnitten, nicht aus den Blöcken
+     * zusammengesetzt.
+     *
+     * Das ist die zentrale Zusicherung dieser Funktion:
+     *
+     *     text.slice(chunk.charStart, chunk.charEnd) === chunk.content
+     *
+     * Ohne sie zeigt jedes Zitat ein paar Zeichen daneben — und zwar
+     * unauffällig: die Antwort stimmt, der Verweis stimmt, nur die Markierung
+     * im Dokument sitzt falsch. Genau das untergräbt das Vertrauen, das
+     * Zitate herstellen sollen. Ein Zusammensetzen mit '\n\n' kann die
+     * Zusicherung nicht halten, weil zwischen zwei Blöcken im Original auch
+     * drei Leerzeilen oder ein Seitenumbruch stehen können.
+     */
+    const raw = text.slice(first.start, last.end);
+    const leading = raw.length - raw.trimStart().length;
+    const content = raw.trim();
     if (content.length === 0) {
       pending = [];
       return;
     }
 
+    // Die Grenzen wandern mit dem Trimmen mit, sonst wäre die Zusicherung
+    // schon durch einen abschließenden Zeilenumbruch verletzt.
+    const charStart = first.start + leading;
+
     chunks.push({
       idx: chunks.length,
       content,
       headingPath: pendingHeadingPath,
-      page: pageForOffset(first.start, pageBreaks),
-      charStart: first.start,
-      charEnd: last.end,
+      page: pageForOffset(charStart, pageBreaks),
+      charStart,
+      charEnd: charStart + content.length,
       tokenCount: estimateTokens(content),
     });
     pending = [];
@@ -352,11 +370,17 @@ export function chunkText(text: string, options: ChunkOptions = {}): Chunk[] {
       previous.headingPath === chunk.headingPath &&
       previous.page === chunk.page
     ) {
+      // Auch hier aus dem Originaltext schneiden, nicht die beiden Inhalte
+      // aneinanderhängen: sonst bricht die Zusicherung
+      // `text.slice(charStart, charEnd) === content` genau an den
+      // zusammengelegten Abschnitten — und die fielen bei einer Stichprobe am
+      // ersten Abschnitt nicht auf.
+      const mergedContent = text.slice(previous.charStart, chunk.charEnd);
       merged[merged.length - 1] = {
         ...previous,
-        content: `${previous.content}\n\n${chunk.content}`,
+        content: mergedContent,
         charEnd: chunk.charEnd,
-        tokenCount: estimateTokens(`${previous.content}\n\n${chunk.content}`),
+        tokenCount: estimateTokens(mergedContent),
       };
       continue;
     }
