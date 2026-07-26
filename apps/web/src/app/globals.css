@@ -1,0 +1,281 @@
+@import 'tailwindcss';
+
+/*
+ * Dark Mode wird über eine Klasse gesteuert (next-themes), nicht über
+ * prefers-color-scheme allein — sonst kann der Nutzer nicht umschalten.
+ */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/*
+ * ── Design Tokens ───────────────────────────────────────────────────────────
+ * Einzige Quelle der Wahrheit für Farbe, Radius und Typografie.
+ * Komponenten benutzen ausschließlich diese Tokens, niemals rohe Hex-Werte.
+ *
+ * Farbraum ist oklch: gleiche Lightness-Zahl bedeutet gleiche wahrgenommene
+ * Helligkeit, dadurch bleiben Kontraste beim Umfärben stabil.
+ *
+ * Gestalterische Richtung: warmes Papier im Light Mode (die App zeigt vor allem
+ * Lesetexte), tiefes kühles Grau im Dark Mode, dazu ein Petrol-Akzent. Bewusst
+ * kein Blau wie das Original und kein Violett-Gradient.
+ */
+@theme {
+  /* Basis-Neutrals (warm) */
+  --color-paper-50: oklch(0.99 0.003 85);
+  --color-paper-100: oklch(0.975 0.004 85);
+  --color-paper-200: oklch(0.94 0.005 85);
+  --color-paper-300: oklch(0.89 0.006 82);
+  --color-paper-400: oklch(0.72 0.008 80);
+  --color-paper-500: oklch(0.58 0.009 78);
+  --color-paper-600: oklch(0.46 0.009 76);
+  --color-paper-700: oklch(0.36 0.009 74);
+  --color-paper-800: oklch(0.26 0.008 72);
+  --color-paper-900: oklch(0.19 0.007 70);
+  --color-paper-950: oklch(0.14 0.006 68);
+
+  /* Akzent: Petrol */
+  --color-teal-50: oklch(0.97 0.02 195);
+  --color-teal-100: oklch(0.93 0.04 195);
+  --color-teal-200: oklch(0.86 0.07 195);
+  --color-teal-300: oklch(0.77 0.09 195);
+  --color-teal-400: oklch(0.66 0.11 195);
+  --color-teal-500: oklch(0.56 0.11 196);
+  --color-teal-600: oklch(0.48 0.1 198);
+  --color-teal-700: oklch(0.4 0.085 200);
+  --color-teal-800: oklch(0.32 0.065 202);
+  --color-teal-900: oklch(0.25 0.05 204);
+
+  /* Sekundär: Bernstein, markiert generierte/KI-Inhalte */
+  --color-amber-100: oklch(0.94 0.05 78);
+  --color-amber-300: oklch(0.83 0.12 76);
+  --color-amber-500: oklch(0.71 0.15 70);
+  --color-amber-700: oklch(0.52 0.12 62);
+  --color-amber-900: oklch(0.33 0.08 58);
+
+  /* Signalfarben */
+  --color-danger-100: oklch(0.94 0.03 25);
+  --color-danger-400: oklch(0.68 0.17 25);
+  --color-danger-500: oklch(0.58 0.19 25);
+  --color-danger-700: oklch(0.45 0.16 25);
+  --color-success-100: oklch(0.94 0.04 152);
+  --color-success-500: oklch(0.6 0.13 152);
+  --color-success-700: oklch(0.45 0.11 152);
+
+  /* Semantische Tokens — hier greifen die Komponenten zu */
+  --color-background: var(--color-paper-100);
+  --color-surface: oklch(1 0 0);
+  --color-surface-raised: oklch(1 0 0);
+  --color-surface-sunken: var(--color-paper-200);
+  --color-foreground: var(--color-paper-900);
+  --color-muted: var(--color-paper-200);
+  --color-muted-foreground: var(--color-paper-500);
+  --color-border: var(--color-paper-300);
+  --color-border-strong: var(--color-paper-400);
+  --color-input: var(--color-paper-300);
+  --color-ring: var(--color-teal-500);
+
+  --color-primary: var(--color-teal-600);
+  --color-primary-hover: var(--color-teal-700);
+  --color-primary-foreground: oklch(1 0 0);
+  --color-primary-subtle: var(--color-teal-50);
+
+  --color-accent: var(--color-amber-500);
+  --color-accent-subtle: var(--color-amber-100);
+  --color-accent-foreground: var(--color-amber-900);
+
+  --color-destructive: var(--color-danger-500);
+  --color-destructive-subtle: var(--color-danger-100);
+  --color-destructive-foreground: oklch(1 0 0);
+
+  --color-success: var(--color-success-500);
+  --color-success-subtle: var(--color-success-100);
+
+  /* App-spezifisch: Zitate sind das zentrale Vertrauenselement der App */
+  --color-citation: var(--color-teal-600);
+  --color-citation-bg: var(--color-teal-50);
+  --color-citation-border: var(--color-teal-200);
+  --color-highlight: oklch(0.93 0.11 95 / 0.55);
+
+  /* Typografie */
+  --font-sans:
+    var(--font-instrument-sans), ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-serif: var(--font-source-serif), Charter, Georgia, serif;
+  --font-mono: var(--font-jetbrains-mono), ui-monospace, monospace;
+
+  /* Radien: weich, aber nicht verspielt */
+  --radius-xs: 0.25rem;
+  --radius-sm: 0.375rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+  --radius-2xl: 1.5rem;
+
+  /* Schatten: sehr zurückhaltend, Struktur kommt über Ränder */
+  --shadow-subtle: 0 1px 2px 0 oklch(0.19 0.007 70 / 0.05);
+  --shadow-card: 0 1px 3px 0 oklch(0.19 0.007 70 / 0.07);
+  --shadow-popover:
+    0 8px 24px -6px oklch(0.19 0.007 70 / 0.14), 0 2px 6px -2px oklch(0.19 0.007 70 / 0.08);
+
+  /* Motion: kurz und funktional; niemals dekorative Verzögerung */
+  --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
+  --animate-fade-in: fade-in 160ms var(--ease-out-quart);
+  --animate-slide-up: slide-up 200ms var(--ease-out-quart);
+  --animate-shimmer: shimmer 1.8s ease-in-out infinite;
+  --animate-caret: caret 1s steps(2) infinite;
+}
+
+.dark {
+  --color-background: var(--color-paper-950);
+  --color-surface: var(--color-paper-900);
+  --color-surface-raised: var(--color-paper-800);
+  --color-surface-sunken: oklch(0.11 0.005 68);
+  --color-foreground: var(--color-paper-100);
+  --color-muted: var(--color-paper-800);
+  --color-muted-foreground: var(--color-paper-400);
+  --color-border: oklch(0.28 0.008 72);
+  --color-border-strong: oklch(0.38 0.009 74);
+  --color-input: oklch(0.3 0.008 72);
+  --color-ring: var(--color-teal-400);
+
+  --color-primary: var(--color-teal-400);
+  --color-primary-hover: var(--color-teal-300);
+  --color-primary-foreground: var(--color-paper-950);
+  --color-primary-subtle: oklch(0.26 0.045 200);
+
+  --color-accent: var(--color-amber-300);
+  --color-accent-subtle: oklch(0.3 0.05 70);
+  --color-accent-foreground: var(--color-amber-100);
+
+  --color-destructive: var(--color-danger-400);
+  --color-destructive-subtle: oklch(0.28 0.07 25);
+
+  --color-success: oklch(0.7 0.13 152);
+  --color-success-subtle: oklch(0.28 0.05 152);
+
+  --color-citation: var(--color-teal-300);
+  --color-citation-bg: oklch(0.27 0.045 198);
+  --color-citation-border: oklch(0.38 0.06 198);
+  --color-highlight: oklch(0.72 0.13 95 / 0.32);
+
+  --shadow-subtle: 0 1px 2px 0 oklch(0 0 0 / 0.4);
+  --shadow-card: 0 1px 3px 0 oklch(0 0 0 / 0.5);
+  --shadow-popover: 0 8px 24px -6px oklch(0 0 0 / 0.6), 0 2px 6px -2px oklch(0 0 0 / 0.4);
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes shimmer {
+  0%,
+  100% {
+    opacity: 0.45;
+  }
+  50% {
+    opacity: 0.75;
+  }
+}
+
+@keyframes caret {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
+}
+
+@layer base {
+  *,
+  ::after,
+  ::before {
+    border-color: var(--color-border);
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    font-feature-settings: 'cv11', 'ss01';
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  /*
+   * Fokus-Ringe sind nicht optional. Sie sind für Tastaturnutzer die einzige
+   * Orientierung; `outline: none` ohne Ersatz ist ein Accessibility-Bug.
+   */
+  :focus-visible {
+    outline: 2px solid var(--color-ring);
+    outline-offset: 2px;
+    border-radius: var(--radius-xs);
+  }
+
+  /* Nutzer mit prefers-reduced-motion bekommen keine Bewegung, nur Zustände. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    ::before,
+    ::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+
+  ::selection {
+    background-color: var(--color-citation-bg);
+    color: var(--color-foreground);
+  }
+
+  /* Dezente Scrollbars — die App hat viele scrollbare Spalten. */
+  @supports (scrollbar-width: thin) {
+    * {
+      scrollbar-width: thin;
+      scrollbar-color: var(--color-border-strong) transparent;
+    }
+  }
+}
+
+@layer utilities {
+  /* Für Screenreader sichtbar, visuell versteckt (Skip-Links, Live-Regionen). */
+  .sr-only-focusable:not(:focus):not(:focus-within) {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border-width: 0;
+  }
+
+  /* Textstelle, auf die ein Zitat verweist. */
+  .cited-range {
+    background-color: var(--color-highlight);
+    border-radius: var(--radius-xs);
+    box-shadow: 0 0 0 2px var(--color-highlight);
+  }
+}

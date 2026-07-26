@@ -1,0 +1,10 @@
+node_modules/
+.next/
+dist/
+coverage/
+playwright-report/
+test-results/
+package-lock.json
+*.tsbuildinfo
+apps/web/next-env.d.ts
+volumes/

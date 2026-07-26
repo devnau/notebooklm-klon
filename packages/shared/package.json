@@ -1,0 +1,24 @@
+{
+  "name": "@nlm/shared",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Geteilte Typen, Zod-Schemas und Konstanten für Web-App und Worker.",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./*": {
+      "types": "./dist/*.d.ts",
+      "default": "./dist/*.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc --build tsconfig.build.json",
+    "clean": "rm -rf dist *.tsbuildinfo"
+  },
+  "dependencies": {
+    "zod": "^4.4.3"
+  }
+}

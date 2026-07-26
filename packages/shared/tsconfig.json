@@ -1,0 +1,17 @@
+{
+  // Konfiguration für Editor, ESLint und Typecheck: enthält auch die Tests,
+  // damit sie typgeprüft werden. Emittiert nichts.
+  // Der eigentliche Build läuft über tsconfig.build.json.
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "module": "NodeNext",
+    "moduleResolution": "nodenext",
+    "types": ["node", "vitest/globals"],
+    "noEmit": true,
+    "composite": false,
+    "declaration": false,
+    "declarationMap": false,
+    "incremental": false
+  },
+  "include": ["src/**/*.ts"]
+}

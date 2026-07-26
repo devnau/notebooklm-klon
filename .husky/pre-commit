@@ -1,0 +1,17 @@
+#!/usr/bin/env sh
+set -e
+
+# 1. Secret-Scan zuerst — ein durchgerutschter Key ist bei einem öffentlichen
+#    Repo nicht mehr zurückzuholen, also blockieren wir vor allem anderen.
+if command -v gitleaks >/dev/null 2>&1; then
+  gitleaks protect --staged --redact --no-banner
+elif command -v docker >/dev/null 2>&1; then
+  docker run --rm -v "$(pwd):/repo" -w /repo zricethezav/gitleaks:latest \
+    protect --staged --redact --no-banner
+else
+  echo "⚠  gitleaks nicht gefunden — Secret-Scan übersprungen."
+  echo "   Installation: brew install gitleaks   (die CI prüft ohnehin nach)"
+fi
+
+# 2. Format und Lint nur auf den gestageten Dateien.
+npx --no-install lint-staged

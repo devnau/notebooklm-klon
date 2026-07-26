@@ -1,0 +1,47 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Build output
+.next/
+out/
+dist/
+build/
+*.tsbuildinfo
+next-env.d.ts
+
+# Secrets — never commit real values, only .env.example
+.env
+.env.*
+!.env.example
+
+# Docker volumes (Supabase data, storage objects)
+volumes/
+docker/volumes/
+
+# Test artifacts
+coverage/
+playwright-report/
+test-results/
+blob-report/
+.playwright/
+
+# Generated assets
+apps/web/public/audio/
+tmp/
+*.mp3
+*.wav
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json.example
+*.swp
+
+# Logs
+*.log
+npm-debug.log*
+logs/

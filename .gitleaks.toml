@@ -1,0 +1,45 @@
+title = "notebooklm-klon gitleaks config"
+
+# Basis-Regelsatz von gitleaks übernehmen und um projektspezifische Muster ergänzen.
+[extend]
+useDefault = true
+
+[[rules]]
+id = "anthropic-api-key"
+description = "Anthropic API key"
+regex = '''sk-ant-[a-zA-Z0-9_\-]{20,}'''
+keywords = ["sk-ant-"]
+
+[[rules]]
+id = "voyage-api-key"
+description = "Voyage AI API key"
+regex = '''pa-[a-zA-Z0-9_\-]{30,}'''
+keywords = ["pa-"]
+
+[[rules]]
+id = "supabase-service-role-jwt"
+description = "Supabase service_role JWT"
+regex = '''eyJ[a-zA-Z0-9_\-]{10,}\.eyJ[a-zA-Z0-9_\-]{20,}\.[a-zA-Z0-9_\-]{20,}'''
+keywords = ["eyJ"]
+
+[[rules]]
+id = "postgres-connection-string"
+description = "Postgres connection string with inline password"
+regex = '''postgres(?:ql)?:\/\/[^:\s]+:[^@\s]+@'''
+keywords = ["postgres://", "postgresql://"]
+
+[allowlist]
+description = "Platzhalter und Beispieldateien"
+paths = [
+  '''\.env\.example$''',
+  '''(^|/)package-lock\.json$''',
+  '''(^|/)docs/.*\.md$''',
+  '''(^|/)tests/fixtures/''',
+]
+regexes = [
+  # Platzhalter in .env.example und Dokumentation
+  '''sk-ant-your-key-here''',
+  '''<[A-Z_]+>''',
+  '''REPLACE_ME''',
+  '''changeme''',
+]

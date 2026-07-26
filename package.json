@@ -1,0 +1,60 @@
+{
+  "name": "notebooklm-klon",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Self-hosted NotebookLM-Klon: grounded RAG-Chat mit klickbaren Zitaten, Studio-Artefakten und Audio-Overview.",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace=@nlm/web",
+    "build": "npm run build --workspace=@nlm/shared && npm run build --workspace=@nlm/web",
+    "start": "npm run start --workspace=@nlm/web",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "typecheck": "tsc --build --force && tsc --noEmit -p packages/shared && tsc --noEmit -p apps/web",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "prepare": "husky"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^21.2.1",
+    "@commitlint/config-conventional": "^21.2.0",
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^26.1.1",
+    "eslint": "^10.8.0",
+    "eslint-config-prettier": "^10.1.8",
+    "husky": "^9.1.7",
+    "lint-staged": "^17.2.0",
+    "prettier": "^3.9.6",
+    "prettier-plugin-tailwindcss": "^0.8.1",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.65.0",
+    "vitest": "^4.1.10"
+  },
+  "overrides": {
+    "next": {
+      "postcss": "^8.5.23",
+      "sharp": "^0.35.3"
+    },
+    "postcss": "^8.5.23",
+    "sharp": "^0.35.3"
+  },
+  "lint-staged": {
+    "*.{ts,tsx,js,mjs,cjs}": [
+      "prettier --write",
+      "eslint --fix"
+    ],
+    "*.{json,md,yml,yaml,css,sql}": [
+      "prettier --write"
+    ]
+  }
+}
