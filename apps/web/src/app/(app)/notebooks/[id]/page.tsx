@@ -1,10 +1,11 @@
-import { FileText, MessageSquareQuote, Sparkles } from 'lucide-react';
+import { notebookRoleSchema } from '@nlm/shared';
+import { MessageSquareQuote, Sparkles } from 'lucide-react';
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 
 import { NotebookHeader } from '@/components/notebooks/notebook-header';
+import { SourcesPanel, type SourceRow } from '@/components/sources/sources-panel';
 import { WorkspaceShell } from '@/components/layout/workspace-shell';
-import { EmptyState } from '@/components/ui/empty-state';
 import { createClient } from '@/lib/supabase/server';
 
 type Params = { readonly params: Promise<{ id: string }> };
@@ -44,13 +45,33 @@ export default async function NotebookPage({ params }: Params) {
     .eq('notebook_id', id)
     .maybeSingle();
 
-  const role = membership?.role ?? 'viewer';
+  // Der generierte Typ kennt nur `string`, weil die Rolle in der Datenbank per
+  // CHECK-Constraint eingegrenzt ist und nicht als Enum-Typ. Das Schema aus
+  // @nlm/shared spiegelt dieselben Werte und macht daraus wieder einen Typ.
+  const role = notebookRoleSchema.catch('viewer').parse(membership?.role);
+
+  /*
+   * Die Quellen kommen vom Server, damit die Spalte beim ersten Aufruf gefüllt
+   * ist. Alles Weitere — Statuswechsel während des Imports — läuft danach über
+   * Realtime im Client-Teil.
+   */
+  const { data: sources } = await supabase
+    .from('sources')
+    .select('id, kind, title, status, error, page_count, char_count, created_at')
+    .eq('notebook_id', id)
+    .order('created_at', { ascending: false });
 
   return (
     <>
       <NotebookHeader notebook={notebook} role={role} />
       <WorkspaceShell
-        sources={<SourcesPlaceholder />}
+        sources={
+          <SourcesPanel
+            notebookId={id}
+            role={role}
+            initialSources={(sources ?? []) as SourceRow[]}
+          />
+        }
         chat={<ChatPlaceholder />}
         studio={<StudioPlaceholder />}
       />
@@ -58,24 +79,8 @@ export default async function NotebookPage({ params }: Params) {
   );
 }
 
-/* Die drei Bereiche entstehen in Phase 2 bis 4. Bis dahin steht hier, was
+/* Chat und Studio entstehen in Phase 3 und 4. Bis dahin steht hier, was
    kommt — ein leerer Kasten würde wie ein Fehler wirken. */
-
-function SourcesPlaceholder() {
-  return (
-    <div className="border-b p-4 lg:border-b-0">
-      <h2 className="mb-3 flex items-center gap-2 text-sm font-medium">
-        <FileText className="text-muted-foreground size-4" aria-hidden />
-        Quellen
-      </h2>
-      <EmptyState
-        className="border-0 px-2 py-8"
-        title="Noch keine Quellen"
-        description="Ab Phase 2: PDFs, Dokumente, Webseiten und eingefügter Text — hochgeladen, extrahiert und durchsuchbar gemacht."
-      />
-    </div>
-  );
-}
 
 function ChatPlaceholder() {
   return (
