@@ -3,11 +3,14 @@ set -e
 
 # 1. Secret-Scan zuerst — ein durchgerutschter Key ist bei einem öffentlichen
 #    Repo nicht mehr zurückzuholen, also blockieren wir vor allem anderen.
+# Version identisch zur CI gepinnt, damit lokal und dort dasselbe geprüft wird.
+GITLEAKS_VERSION=v8.30.1
+
 if command -v gitleaks >/dev/null 2>&1; then
-  gitleaks protect --staged --redact --no-banner
+  gitleaks protect --staged --config .gitleaks.toml --redact --no-banner
 elif command -v docker >/dev/null 2>&1; then
-  docker run --rm -v "$(pwd):/repo" -w /repo zricethezav/gitleaks:latest \
-    protect --staged --redact --no-banner
+  docker run --rm -v "$(pwd):/repo" -w /repo "zricethezav/gitleaks:$GITLEAKS_VERSION" \
+    protect --staged --config .gitleaks.toml --redact --no-banner
 else
   echo "⚠  gitleaks nicht gefunden — Secret-Scan übersprungen."
   echo "   Installation: brew install gitleaks   (die CI prüft ohnehin nach)"

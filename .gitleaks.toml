@@ -28,18 +28,34 @@ description = "Postgres connection string with inline password"
 regex = '''postgres(?:ql)?:\/\/[^:\s]+:[^@\s]+@'''
 keywords = ["postgres://", "postgresql://"]
 
+  # docker-compose.yml enthält Verbindungsstrings der Form
+  # postgres://role:${POSTGRES_PASSWORD}@db:5432/postgres — das ist eine
+  # Compose-Variablenreferenz, kein Passwort. Die Regel bleibt scharf für
+  # tatsächlich eingebettete Passwörter.
+  #
+  # RE2 (die Regex-Engine von gitleaks) kennt kein Lookahead, deshalb ist das
+  # eine Allowlist und keine Negation im Muster selbst.
+  [rules.allowlist]
+  regexes = ['''postgres(?:ql)?:\/\/[^:\s]+:\$\{[A-Za-z_][A-Za-z0-9_]*\}@''']
+  regexTarget = "match"
+
 [allowlist]
-description = "Platzhalter und Beispieldateien"
+description = "Platzhalter, Beispieldateien und bekannte Testwerte"
 paths = [
   '''\.env\.example$''',
   '''(^|/)package-lock\.json$''',
-  '''(^|/)docs/.*\.md$''',
   '''(^|/)tests/fixtures/''',
 ]
 regexes = [
-  # Platzhalter in .env.example und Dokumentation
+  # Platzhalter in .env.example und in der Dokumentation
   '''sk-ant-your-key-here''',
   '''<[A-Z_]+>''',
   '''REPLACE_ME''',
   '''changeme''',
+  # Feste Testzugangsdaten des Smoke-Tests. Bewusst als exakter Wert
+  # freigegeben und nicht die ganze Datei: ein echter Schlüssel, der dort
+  # hineingerät, soll weiterhin gefunden werden.
+  '''smoke-test-passwort-2026''',
+  # Beispiel-Passwörter in der Dokumentation
+  '''your-super-secret''',
 ]
