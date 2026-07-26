@@ -71,8 +71,19 @@ export function SourcesPanel({
   useEffect(() => {
     const supabase = createClient();
 
+    /*
+     * Der Kanalname bekommt eine Zufallskomponente. `supabase.channel()` gibt
+     * bei gleichem Namen dieselbe Instanz zurück — und React ruft Effekte im
+     * Strict Mode zweimal auf. Der zweite Durchlauf träfe damit auf einen
+     * bereits abonnierten Kanal, auf dem `.on()` nicht mehr erlaubt ist:
+     * „cannot add postgres_changes callbacks after subscribe()". Der Abbau des
+     * ersten Kanals läuft asynchron und ist zu diesem Zeitpunkt nicht fertig.
+     *
+     * Der Name ist ohnehin nur ein lokaler Bezeichner; welche Zeilen jemand zu
+     * sehen bekommt, entscheidet die RLS-Policy auf `sources`, nicht der Name.
+     */
     const channel = supabase
-      .channel(`sources:${notebookId}`)
+      .channel(`sources:${notebookId}:${crypto.randomUUID()}`)
       .on(
         'postgres_changes',
         {

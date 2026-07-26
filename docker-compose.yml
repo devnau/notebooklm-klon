@@ -201,6 +201,66 @@ services:
       retries: 10
       start_period: 20s
 
+  # ── Realtime ────────────────────────────────────────────────────────────────
+  # Liefert Änderungen an `sources` live in die Oberfläche, statt sie im Client
+  # abzufragen. Ein Import läuft Minuten; ein Polling-Intervall wäre entweder zu
+  # träge für die Anzeige oder zu gesprächig für den Server.
+  #
+  # Wichtig fürs Sicherheitsmodell: Realtime wertet die RLS-Policies für jeden
+  # Abonnenten einzeln aus. Wer ein Notebook nicht sehen darf, bekommt dessen
+  # Ereignisse auch dann nicht, wenn er den Kanalnamen errät.
+  realtime:
+    image: supabase/realtime:v2.51.11
+    container_name: nlm-realtime
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      PORT: 4000
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: postgres
+      # supabase_admin, weil Realtime beim Start eigene Schemas (_realtime,
+      # realtime) anlegt und Replikations-Slots verwaltet.
+      DB_USER: supabase_admin
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      DB_AFTER_CONNECT_QUERY: 'SET search_path TO _realtime'
+      DB_ENC_KEY: ${REALTIME_ENC_KEY:?REALTIME_ENC_KEY fehlt in .env}
+      API_JWT_SECRET: ${JWT_SECRET}
+      SECRET_KEY_BASE: ${REALTIME_SECRET_KEY_BASE:?REALTIME_SECRET_KEY_BASE fehlt in .env}
+      APP_NAME: notebooklm
+      # Ein einzelner Knoten: kein Cluster-Discovery, kein verteiltes Erlang.
+      ERL_AFLAGS: '-proto_dist inet_tcp'
+      DNS_NODES: "''"
+      RLIMIT_NOFILE: '10000'
+      # Legt den Standard-Tenant selbst an. Ohne das müsste er nach jedem
+      # Zurücksetzen der Datenbank von Hand über die API eingetragen werden.
+      SEED_SELF_HOST: 'true'
+      RUN_JANITOR: 'true'
+      # Der Tenant-Name ist nicht frei wählbar: SEED_SELF_HOST legt ihn unter
+      # der festen Kennung `realtime-dev` an, und supabase-js spricht ihn über
+      # genau diese an. Ein eigener Name führt zu einem 404 beim Verbinden.
+      SELF_HOST_TENANT_NAME: realtime-dev
+      SERVICE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
+    # Der Health-Endpunkt ist authentifiziert und antwortet ohne Token mit 403.
+    # Ein Healthcheck, der 403 als "krank" wertet, hielte den Stack für kaputt,
+    # obwohl der Dienst arbeitet — deshalb wird der service_role-Key
+    # mitgeschickt. Geprüft wird damit auch gleich, dass das JWT-Secret
+    # zwischen Realtime und dem Rest übereinstimmt.
+    healthcheck:
+      test:
+        [
+          'CMD-SHELL',
+          'curl -sSf -o /dev/null -H "Authorization: Bearer $$SERVICE_KEY" http://127.0.0.1:4000/api/tenants/realtime-dev/health',
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
   # ── Storage-Migrationen ─────────────────────────────────────────────────────
   # Zweiter Migrationsdurchlauf, nachdem der Storage-Dienst sein eigenes Schema
   # angelegt hat. storage.buckets existiert vorher nicht — die Buckets und die
@@ -238,6 +298,8 @@ services:
       rest:
         condition: service_started
       storage:
+        condition: service_started
+      realtime:
         condition: service_started
       # Erst wenn die Buckets stehen: sonst antwortet die Anwendung auf einen
       # Upload mit "Bucket not found", und das sieht nach einem Fehler in der

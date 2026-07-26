@@ -17,6 +17,8 @@ import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { setTimeout as sleep } from 'node:timers/promises';
 
+import { createClient } from '@supabase/supabase-js';
+
 const env = Object.fromEntries(
   readFileSync(new URL('../.env', import.meta.url), 'utf8')
     .split('\n')
@@ -29,7 +31,9 @@ const env = Object.fromEntries(
 
 const GATEWAY = env.PUBLIC_GATEWAY_URL ?? 'http://localhost:8000';
 const SERVICE = env.SUPABASE_SERVICE_ROLE_KEY;
+const ANON = env.SUPABASE_ANON_KEY;
 const TIMEOUT_MS = 120_000;
+const PASSWORD = 'ingest-e2e-passwort-1234';
 
 /*
  * `-q` unterdrückt die Befehlsmeldungen ("INSERT 0 1"), die psql sonst zwischen
@@ -54,18 +58,66 @@ async function main() {
   // ein Fehlschlag in der Mitte hinterlässt sonst einen Nutzer, der jeden
   // weiteren Lauf blockiert.
   psql(`delete from auth.users where email = 'ingest-e2e@example.test';`);
-  const userId = psql(`
-    insert into auth.users (id, instance_id, aud, role, email, encrypted_password,
-                            email_confirmed_at, created_at, updated_at)
-    values (gen_random_uuid(), '00000000-0000-0000-0000-000000000000', 'authenticated',
-            'authenticated', 'ingest-e2e@example.test', crypt('x', gen_salt('bf')),
-            now(), now(), now())
-    returning id;
-  `);
+
+  /*
+   * Der Nutzer wird über GoTrue angelegt, nicht per SQL: nur so entsteht eine
+   * echte Sitzung, und nur mit der lässt sich prüfen, was hier eigentlich
+   * geprüft werden soll — dass die Statusmeldungen über Realtime *beim Nutzer*
+   * ankommen, gefiltert durch dieselbe RLS wie jeder andere Zugriff.
+   */
+  const signUp = await fetch(`${GATEWAY}/auth/v1/signup`, {
+    method: 'POST',
+    headers: { apikey: ANON, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: 'ingest-e2e@example.test', password: PASSWORD }),
+  });
+  const session = await signUp.json();
+  if (!signUp.ok || !session.access_token) {
+    throw new Error(`Registrierung fehlgeschlagen: ${JSON.stringify(session)}`);
+  }
+  const userId = session.user.id;
 
   const notebookId = psql(
     `insert into public.notebooks (owner_id, title) values ('${userId}', 'Ingest-Probe') returning id;`,
   );
+
+  console.log('→ Realtime abonnieren (als angemeldeter Nutzer) ...');
+  const client = createClient(GATEWAY, ANON, {
+    auth: { persistSession: false, autoRefreshToken: false },
+    global: { headers: { Authorization: `Bearer ${session.access_token}` } },
+  });
+  client.realtime.setAuth(session.access_token);
+
+  const seenStatuses = [];
+  const channel = client
+    .channel(`e2e:${notebookId}`)
+    .on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'sources',
+        filter: `notebook_id=eq.${notebookId}`,
+      },
+      (payload) => {
+        if (payload.new?.status) seenStatuses.push(payload.new.status);
+      },
+    );
+
+  await new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new Error('Realtime-Abo kam nicht zustande (Timeout)'));
+    }, 15_000);
+    channel.subscribe((status, error) => {
+      if (status === 'SUBSCRIBED') {
+        clearTimeout(timer);
+        resolve();
+      } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+        clearTimeout(timer);
+        reject(new Error(`Realtime-Abo fehlgeschlagen: ${status} ${error ?? ''}`));
+      }
+    });
+  });
+  console.log('  ✓ Kanal abonniert');
 
   // Eine echte Datei, kein Attrappen-Text: der Extraktor soll wirklich arbeiten.
   const pdf = readFileSync(new URL('../tests/fixtures/zwei-seiten.pdf', import.meta.url));
@@ -150,6 +202,22 @@ async function main() {
   if (jobStatus !== 'done')
     throw new Error(`Job steht auf "${jobStatus}", erwartet "done"`);
   console.log('  ✓ Job abgeschlossen');
+
+  /*
+   * Der Grund, warum die Oberfläche ohne Polling auskommt. Ein leeres
+   * seenStatuses hieße: die Quellenliste bliebe stehen, bis der Nutzer die
+   * Seite neu lädt — und niemand würde es beim Klicken merken, weil der
+   * Serverzustand nach einem Reload ja stimmt.
+   */
+  if (seenStatuses.length === 0) {
+    throw new Error('Keine Realtime-Ereignisse empfangen');
+  }
+  if (!seenStatuses.includes('ready')) {
+    throw new Error(`Kein "ready" über Realtime, nur: ${seenStatuses.join(', ')}`);
+  }
+  console.log(`  ✓ Realtime lieferte ${seenStatuses.length} Statuswechsel`);
+
+  await client.removeChannel(channel);
 
   console.log('→ Aufräumen ...');
   psql(`delete from public.notebooks where id = '${notebookId}';`);

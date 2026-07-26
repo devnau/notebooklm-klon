@@ -18,6 +18,7 @@
    │   /auth/v1/*     → GoTrue                                      │
    │   /rest/v1/*     → PostgREST                                   │
    │   /storage/v1/*  → Storage-API                                 │
+   │   /realtime/v1/* → Realtime (WebSocket)                        │
    └───────────┬────────────────────────────────────────────────────┘
                │
    ┌───────────▼────────────────────────────────────────────────────┐
@@ -25,15 +26,38 @@
    │   public.*   Anwendungsdaten, RLS auf jeder Tabelle            │
    │   auth.*     GoTrue                                            │
    │   storage.*  Storage-API                                       │
+   │   realtime.* / _realtime.*  Realtime                           │
    └────────────────────────────────────────────────────────────────┘
 
    Externe APIs:  Anthropic (Chat, Artefakte) · Voyage AI (Embeddings)
    Lokale Dienste: Piper / Kokoro (TTS, ab Phase 5)
 ```
 
-Nach außen ist in Produktion nur Caddy auf 80/443 offen. Postgres, Storage und
-die TTS-Dienste liegen im internen Docker-Netz und haben keinen veröffentlichten
-Port.
+Nach außen ist in Produktion nur Caddy auf 80/443 offen. Postgres, Storage,
+Realtime und die TTS-Dienste liegen im internen Docker-Netz und haben keinen
+veröffentlichten Port.
+
+### Realtime
+
+Statusänderungen an Quellen gehen über einen WebSocket in die Oberfläche, nicht
+über Polling: ein Import läuft Minuten, und ein Intervall wäre entweder zu träge
+für die Anzeige oder zu gesprächig für den Server.
+
+Sicherheitsrelevant ist dabei, dass Realtime die RLS-Policies **für jeden
+Abonnenten einzeln** auswertet. Wer ein Notebook nicht sehen darf, bekommt dessen
+Ereignisse auch dann nicht, wenn er den Kanalnamen errät — der Kanalname ist ein
+lokaler Bezeichner, keine Berechtigung.
+
+Zwei Eigenheiten des self-hosted Betriebs, die beim Aufsetzen Zeit gekostet haben
+und deshalb hier stehen:
+
+- Realtime liest den Tenant aus der **ersten Subdomain des Host-Headers**. Caddy
+  setzt ihn deshalb auf `realtime-dev.localhost` um; ohne das käme `localhost` an
+  und der Dienst antwortete mit „Tenant not found". In der offiziellen
+  Supabase-Compose-Datei passiert dasselbe unbemerkt, weil Kong den Host durch
+  den Upstream-Namen ersetzt.
+- Das Schema `_realtime` legt der Dienst **nicht** selbst an, obwohl er seine
+  Migrationen darin ausführt. Es kommt aus `0006_realtime_schema.sql`.
 
 ## Warum es so gebaut ist
 

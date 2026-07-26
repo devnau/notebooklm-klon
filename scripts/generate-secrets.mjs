@@ -52,6 +52,14 @@ const jwtSecret = randomBytes(48).toString('hex');
 const postgresPassword = password(24);
 const anonKey = supabaseKey('anon', jwtSecret);
 const serviceRoleKey = supabaseKey('service_role', jwtSecret);
+/*
+ * Realtime verschlüsselt die Tenant-Zugangsdaten in seiner eigenen Tabelle mit
+ * DB_ENC_KEY. Die Länge ist nicht frei wählbar: der Dienst erwartet exakt
+ * 16 Zeichen (AES-128) und startet sonst nicht.
+ */
+const realtimeEncKey = randomBytes(8).toString('hex');
+/** Phoenix signiert damit Session-Cookies; 64 Zeichen sind das Minimum. */
+const realtimeSecretKeyBase = randomBytes(32).toString('hex');
 
 process.stdout.write(`# Generiert von scripts/generate-secrets.mjs — NICHT committen.
 # Diese Datei enthält echte Secrets. Auf dem Server: chmod 600 .env
@@ -82,6 +90,11 @@ NEXT_PUBLIC_SUPABASE_URL=http://localhost:8000
 NEXT_PUBLIC_SUPABASE_ANON_KEY=${anonKey}
 GATEWAY_PORT=8000
 MAILPIT_UI_PORT=8025
+
+# ── Realtime ─────────────────────────────────────────────────────────────────
+# DB_ENC_KEY muss exakt 16 Zeichen haben, SECRET_KEY_BASE mindestens 64.
+REALTIME_ENC_KEY=${realtimeEncKey}
+REALTIME_SECRET_KEY_BASE=${realtimeSecretKeyBase}
 
 # ── Verhalten ────────────────────────────────────────────────────────────────
 DISABLE_SIGNUP=false

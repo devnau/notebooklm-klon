@@ -31,6 +31,23 @@
 		reverse_proxy storage:5000
 	}
 
+	# Realtime spricht Phoenix: der Client verbindet sich auf
+	# /realtime/v1/websocket, der Dienst lauscht auf /socket/websocket.
+	# handle_path entfernt das Präfix, rewrite setzt /socket davor.
+	# Caddy erkennt den Upgrade-Header selbst — für WebSockets ist nichts
+	# Zusätzliches nötig.
+	handle_path /realtime/v1/* {
+		rewrite * /socket{uri}
+		reverse_proxy realtime:4000 {
+			# Realtime liest den Tenant aus der ersten Subdomain des Host-Headers.
+			# Ohne Umschreiben käme "localhost" an und der Dienst antwortete mit
+			# "Tenant not found". In der offiziellen Supabase-Compose-Datei
+			# passiert dasselbe unbemerkt, weil Kong den Host durch den
+			# Upstream-Namen `realtime-dev.supabase-realtime` ersetzt.
+			header_up Host realtime-dev.localhost
+		}
+	}
+
 	handle {
 		respond "Not found" 404
 	}
