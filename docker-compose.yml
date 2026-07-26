@@ -1,0 +1,255 @@
+# Entwicklungs-Stack. Für Produktion zusätzlich docker-compose.prod.yml laden:
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# Bewusst ohne Kong: das Gateway ist Caddy, das in Produktion ohnehin für TLS
+# gebraucht wird. Das spart einen Container und eine Konfigurationssprache.
+# Details und Trade-offs in docs/adr/0002-caddy-statt-kong.md.
+
+name: notebooklm-klon
+
+services:
+  # ── Datenbank ───────────────────────────────────────────────────────────────
+  db:
+    image: supabase/postgres:17.6.1.156
+    container_name: nlm-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD fehlt in .env}
+      POSTGRES_DB: postgres
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET fehlt in .env}
+      JWT_EXP: 3600
+    volumes:
+      - db-data:/var/lib/postgresql/data
+      # Kein Mount auf /docker-entrypoint-initdb.d: das Image legt dort selbst
+      # Rollen (authenticator, anon, service_role, ...) sowie die Schemas auth
+      # und storage an. Ein Verzeichnis-Mount würde das überdecken. Alles
+      # Anwendungsspezifische läuft stattdessen über den migrate-Service.
+    ports:
+      # Nur lokal gebunden — die DB darf nie aus dem Netz erreichbar sein.
+      - '127.0.0.1:${POSTGRES_PORT:-54322}:5432'
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres -h localhost']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+
+  # ── Migrationen ─────────────────────────────────────────────────────────────
+  # Läuft einmal bis zum Ende und beendet sich. Alle anderen Dienste warten
+  # darauf, damit niemand gegen ein halb migriertes Schema startet.
+  migrate:
+    image: postgres:17-alpine
+    container_name: nlm-migrate
+    restart: 'no'
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      PGHOST: db
+      PGUSER: postgres
+      PGDATABASE: postgres
+    volumes:
+      - ./supabase/migrations:/migrations:ro
+      - ./docker/db/migrate.sh:/migrate.sh:ro
+    entrypoint: ['/bin/sh', '/migrate.sh']
+
+  # ── Auth (GoTrue) ───────────────────────────────────────────────────────────
+  auth:
+    image: supabase/gotrue:v2.193.1
+    container_name: nlm-auth
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      GOTRUE_API_HOST: 0.0.0.0
+      PORT: 9999
+      GOTRUE_DB_DRIVER: postgres
+      GOTRUE_DB_DATABASE_URL: postgres://supabase_auth_admin:${POSTGRES_PASSWORD}@db:5432/postgres?search_path=auth&sslmode=disable
+
+      API_EXTERNAL_URL: ${PUBLIC_GATEWAY_URL:-http://localhost:8000}
+      GOTRUE_SITE_URL: ${PUBLIC_APP_URL:-http://localhost:3000}
+      GOTRUE_URI_ALLOW_LIST: ${PUBLIC_APP_URL:-http://localhost:3000}/**
+
+      GOTRUE_JWT_SECRET: ${JWT_SECRET}
+      GOTRUE_JWT_EXP: 3600
+      GOTRUE_JWT_AUD: authenticated
+      GOTRUE_JWT_DEFAULT_GROUP_NAME: authenticated
+      GOTRUE_JWT_ADMIN_ROLES: service_role
+
+      GOTRUE_DISABLE_SIGNUP: ${DISABLE_SIGNUP:-false}
+      GOTRUE_EXTERNAL_EMAIL_ENABLED: 'true'
+      GOTRUE_EXTERNAL_PHONE_ENABLED: 'false'
+      GOTRUE_EXTERNAL_ANONYMOUS_USERS_ENABLED: 'false'
+
+      # Im Dev-Betrieb landen Mails in Mailpit; Bestätigung daher nicht nötig.
+      GOTRUE_MAILER_AUTOCONFIRM: ${MAILER_AUTOCONFIRM:-true}
+      GOTRUE_SMTP_HOST: ${SMTP_HOST:-mailpit}
+      GOTRUE_SMTP_PORT: ${SMTP_PORT:-1025}
+      GOTRUE_SMTP_USER: ${SMTP_USER:-}
+      GOTRUE_SMTP_PASS: ${SMTP_PASS:-}
+      GOTRUE_SMTP_ADMIN_EMAIL: ${SMTP_ADMIN_EMAIL:-noreply@localhost}
+      GOTRUE_SMTP_SENDER_NAME: ${SMTP_SENDER_NAME:-Notebook Studio}
+      GOTRUE_MAILER_URLPATHS_CONFIRMATION: /auth/confirm
+      GOTRUE_MAILER_URLPATHS_RECOVERY: /auth/confirm
+      GOTRUE_MAILER_URLPATHS_EMAIL_CHANGE: /auth/confirm
+      GOTRUE_MAILER_URLPATHS_INVITE: /auth/confirm
+
+      # Passwortregeln: Länge schlägt Zeichenklassen-Zwang.
+      GOTRUE_PASSWORD_MIN_LENGTH: 12
+      GOTRUE_SECURITY_REFRESH_TOKEN_ROTATION_ENABLED: 'true'
+      GOTRUE_SECURITY_REFRESH_TOKEN_REUSE_INTERVAL: 10
+      GOTRUE_RATE_LIMIT_EMAIL_SENT: 30
+      GOTRUE_RATE_LIMIT_TOKEN_REFRESH: 150
+      GOTRUE_RATE_LIMIT_VERIFY: 30
+
+      GOTRUE_LOG_LEVEL: ${LOG_LEVEL:-info}
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'wget',
+          '--no-verbose',
+          '--tries=1',
+          '--spider',
+          'http://127.0.0.1:9999/health',
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  # ── REST (PostgREST) ────────────────────────────────────────────────────────
+  rest:
+    image: postgrest/postgrest:v14.15
+    container_name: nlm-rest
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      PGRST_DB_URI: postgres://authenticator:${POSTGRES_PASSWORD}@db:5432/postgres
+      PGRST_DB_SCHEMAS: public,storage
+      PGRST_DB_ANON_ROLE: anon
+      PGRST_JWT_SECRET: ${JWT_SECRET}
+      PGRST_JWT_AUD: authenticated
+      PGRST_DB_USE_LEGACY_GUCS: 'false'
+      PGRST_APP_SETTINGS_JWT_SECRET: ${JWT_SECRET}
+      PGRST_APP_SETTINGS_JWT_EXP: 3600
+      # Kein automatisches Schema-Reload-Polling; wir triggern per NOTIFY.
+      PGRST_DB_CHANNEL_ENABLED: 'true'
+      PGRST_DB_CHANNEL: pgrst
+      PGRST_LOG_LEVEL: ${LOG_LEVEL:-error}
+      # Admin-Server mit /live und /ready. Ein Docker-Healthcheck ist hier nicht
+      # möglich — das PostgREST-Image ist distroless und hat weder Shell noch
+      # wget. Geprüft wird stattdessen über das Gateway (/rest/v1/) und in
+      # Phase 7 über /api/health der App.
+      PGRST_ADMIN_SERVER_PORT: 3001
+    command: postgrest
+
+  # ── Storage ─────────────────────────────────────────────────────────────────
+  storage:
+    image: supabase/storage-api:v1.67.20
+    container_name: nlm-storage
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      rest:
+        condition: service_started
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      ANON_KEY: ${SUPABASE_ANON_KEY:?SUPABASE_ANON_KEY fehlt in .env}
+      SERVICE_KEY: ${SUPABASE_SERVICE_ROLE_KEY:?SUPABASE_SERVICE_ROLE_KEY fehlt in .env}
+      AUTH_JWT_SECRET: ${JWT_SECRET}
+      PGRST_JWT_SECRET: ${JWT_SECRET}
+      DATABASE_URL: postgres://supabase_storage_admin:${POSTGRES_PASSWORD}@db:5432/postgres
+      DB_INSTALL_ROLES: 'false'
+      POSTGREST_URL: http://rest:3000
+      TENANT_ID: notebooklm
+      REGION: local
+      # Datei-Backend statt S3: für einen einzelnen Server einfacher zu sichern.
+      STORAGE_BACKEND: file
+      FILE_STORAGE_BACKEND_PATH: /var/lib/storage
+      GLOBAL_S3_BUCKET: notebooklm
+      FILE_SIZE_LIMIT: 52428800 # 50 MB, siehe MAX_UPLOAD_BYTES
+      UPLOAD_FILE_SIZE_LIMIT: 52428800
+      UPLOAD_FILE_SIZE_LIMIT_STANDARD: 52428800
+      # Bildtransformation brauchen wir nicht — spart den imgproxy-Container.
+      ENABLE_IMAGE_TRANSFORMATION: 'false'
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    volumes:
+      - storage-data:/var/lib/storage
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'wget',
+          '--no-verbose',
+          '--tries=1',
+          '--spider',
+          'http://127.0.0.1:5000/status',
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  # ── Gateway ─────────────────────────────────────────────────────────────────
+  # Bündelt auth/rest/storage unter einer Origin, wie supabase-js es erwartet.
+  gateway:
+    image: caddy:2-alpine
+    container_name: nlm-gateway
+    restart: unless-stopped
+    depends_on:
+      auth:
+        condition: service_started
+      rest:
+        condition: service_started
+      storage:
+        condition: service_started
+    volumes:
+      - ./docker/caddy/Caddyfile.dev:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    ports:
+      - '127.0.0.1:${GATEWAY_PORT:-8000}:8000'
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'wget',
+          '--no-verbose',
+          '--tries=1',
+          '--spider',
+          'http://127.0.0.1:8000/health',
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # ── Mailpit (nur Entwicklung) ───────────────────────────────────────────────
+  # Fängt alle ausgehenden Mails ab, damit Magic Links testbar sind, ohne
+  # echte Adressen zuzuspammen. Web-UI auf http://localhost:8025
+  mailpit:
+    image: axllent/mailpit:v1.28
+    container_name: nlm-mailpit
+    restart: unless-stopped
+    ports:
+      - '127.0.0.1:${MAILPIT_UI_PORT:-8025}:8025'
+    environment:
+      MP_MAX_MESSAGES: 500
+      MP_SMTP_AUTH_ACCEPT_ANY: 1
+      MP_SMTP_AUTH_ALLOW_INSECURE: 1
+
+volumes:
+  db-data:
+  storage-data:
+  caddy-data:
+  caddy-config:

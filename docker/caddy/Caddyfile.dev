@@ -1,0 +1,37 @@
+# Gateway für die Entwicklung: bündelt Auth, REST und Storage unter einer
+# Origin, damit @supabase/supabase-js mit einer einzigen URL arbeiten kann.
+# TLS und Security-Header kommen in docker/caddy/Caddyfile.prod dazu.
+
+{
+	admin off
+	auto_https off
+	log {
+		level ERROR
+	}
+}
+
+:8000 {
+	# Eigener Health-Endpunkt des Gateways — prüft nur, ob Caddy selbst lebt.
+	handle /health {
+		respond "ok" 200
+	}
+
+	# GoTrue erwartet die Pfade ohne /auth/v1-Prefix.
+	handle_path /auth/v1/* {
+		reverse_proxy auth:9999
+	}
+
+	# PostgREST: /rest/v1/notebooks -> /notebooks
+	handle_path /rest/v1/* {
+		reverse_proxy rest:3000
+	}
+
+	# Storage-API: /storage/v1/object/... -> /object/...
+	handle_path /storage/v1/* {
+		reverse_proxy storage:5000
+	}
+
+	handle {
+		respond "Not found" 404
+	}
+}

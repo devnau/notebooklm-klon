@@ -1,5 +1,6 @@
 import js from '@eslint/js';
 import prettier from 'eslint-config-prettier';
+import globals from 'globals';
 import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
@@ -65,9 +66,13 @@ export default tseslint.config(
     extends: [tseslint.configs.disableTypeChecked],
   },
 
-  // Konfigurationsdateien laufen in Node und dürfen loggen.
+  // Skripte und Konfigurationsdateien laufen in Node: dort sind process,
+  // console und Buffer legitime Globals, und Ausgabe ist der Zweck.
   {
-    files: ['**/*.config.{ts,mjs,js}', 'scripts/**/*.ts'],
+    files: ['scripts/**/*.{mjs,ts}', '**/*.config.{ts,mjs,js}'],
+    languageOptions: {
+      globals: { ...globals.node },
+    },
     rules: {
       'no-console': 'off',
     },
