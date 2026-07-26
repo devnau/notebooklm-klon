@@ -73,9 +73,22 @@ typgeprüft werden — und ESLints `projectService` findet nur Dateien, die in e
 ## Migrationen schreiben
 
 1. Neue Datei in `supabase/migrations/` mit der nächsten Nummer:
-   `0003_sources_and_chunks.sql`.
+   `0006_notes.sql`.
 2. `docker compose up -d migrate` — das Skript wendet nur neue Dateien an.
 3. `node scripts/smoke-test.mjs` als Gegenprobe.
+
+### Zwei Migrationsverzeichnisse
+
+| Verzeichnis                    | Läuft                                    | Wofür                                   |
+| ------------------------------ | ---------------------------------------- | --------------------------------------- |
+| `supabase/migrations/`         | vor allen Diensten (`migrate`)           | Anwendungsschema                        |
+| `supabase/storage-migrations/` | nach dem Storage-Dienst (`storage-init`) | Buckets, Policies auf `storage.objects` |
+
+Der Grund für die Trennung: `storage.buckets` legt der Storage-Dienst selbst an,
+beim ersten Start. Alles, was diese Tabellen anfasst, scheitert im ersten
+Durchlauf — auf einem frischen Volume zuverlässig, auf einem bestehenden nie.
+Genau diese Kombination sorgt dafür, dass so etwas lokal läuft und in der CI
+scheitert. Sie ist uns einmal passiert; deshalb steht es hier.
 
 **Angewandte Migrationen sind unveränderlich.** `migrate.sh` speichert eine
 MD5-Summe je Datei und bricht mit einer deutlichen Meldung ab, wenn sich eine

@@ -3,9 +3,25 @@
 # public.schema_migrations. Idempotent: bereits angewandte Dateien werden
 # übersprungen, sodass der Container bei jedem Stack-Start mitlaufen kann.
 #
+# Zwei Durchläufe, gesteuert über MIGRATIONS_DIR:
+#
+#   /migrations          — Anwendungsschema, läuft vor allen Diensten
+#   /storage-migrations  — Buckets und Policies auf storage.objects
+#
+# Der zweite braucht einen eigenen Durchlauf, weil storage.buckets erst
+# existiert, nachdem der Storage-Dienst beim ersten Start seine eigenen
+# Migrationen gefahren hat. Vorher schlägt jede Anweisung darauf fehl — auf
+# einem frischen Volume zuverlässig, auf einem bestehenden nie. Genau diese
+# Kombination sorgt dafür, dass es lokal läuft und in der CI scheitert.
+#
 # Absichtlich kein `supabase db push`: das würde die Supabase-CLI im Container
 # voraussetzen. Ein Shell-Skript plus psql hat weniger bewegliche Teile.
 set -eu
+
+MIGRATIONS_DIR="${MIGRATIONS_DIR:-/migrations}"
+# Die Rollen-Passwörter setzt nur der erste Durchlauf; der zweite läuft, wenn
+# die Dienste längst verbunden sind.
+SYNC_ROLE_PASSWORDS="${SYNC_ROLE_PASSWORDS:-1}"
 
 echo "→ Warte auf Datenbank ..."
 until pg_isready -q; do
@@ -28,6 +44,7 @@ done
 #    postgres wird vom Image bewusst degradiert.
 #  * Die Anweisungen kommen über stdin, nicht über `-c`: bei `-c` führt psql
 #    keine Variablen-Interpolation durch, `:'pw'` bliebe wörtlich stehen.
+if [ "$SYNC_ROLE_PASSWORDS" = "1" ]; then
 echo "→ Synchronisiere Passwörter der Service-Rollen ..."
 psql -v ON_ERROR_STOP=1 -q -U supabase_admin --set=pw="$PGPASSWORD" <<'SQL'
 do $$
@@ -41,6 +58,7 @@ alter role authenticator          with password :'pw';
 alter role supabase_auth_admin    with password :'pw';
 alter role supabase_storage_admin with password :'pw';
 SQL
+fi
 
 psql -v ON_ERROR_STOP=1 -q <<'SQL'
 create table if not exists public.schema_migrations (
@@ -51,8 +69,11 @@ create table if not exists public.schema_migrations (
 SQL
 
 applied_any=0
-for file in $(find /migrations -name '*.sql' | sort); do
-	version=$(basename "$file" .sql)
+for file in $(find "$MIGRATIONS_DIR" -name '*.sql' | sort); do
+	# Der Ordnername gehört zur Kennung: sonst könnten zwei Migrationen aus
+	# verschiedenen Durchläufen dieselbe Nummer tragen und sich gegenseitig als
+	# "schon angewandt" gelten.
+	version="$(basename "$MIGRATIONS_DIR")/$(basename "$file" .sql)"
 	checksum=$(md5sum "$file" | cut -d' ' -f1)
 
 	existing=$(psql -tAX -c "select checksum from public.schema_migrations where version = '$version'")

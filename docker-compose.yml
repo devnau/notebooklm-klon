@@ -201,6 +201,31 @@ services:
       retries: 10
       start_period: 20s
 
+  # ── Storage-Migrationen ─────────────────────────────────────────────────────
+  # Zweiter Migrationsdurchlauf, nachdem der Storage-Dienst sein eigenes Schema
+  # angelegt hat. storage.buckets existiert vorher nicht — die Buckets und die
+  # Policies auf storage.objects lassen sich also nicht im ersten Durchlauf
+  # anlegen.
+  storage-init:
+    image: postgres:17-alpine
+    container_name: nlm-storage-init
+    restart: 'no'
+    depends_on:
+      storage:
+        condition: service_healthy
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      PGHOST: db
+      PGUSER: postgres
+      PGDATABASE: postgres
+      MIGRATIONS_DIR: /storage-migrations
+      # Die Rollen-Passwörter stehen längst; ein zweites Mal wäre nur Lärm.
+      SYNC_ROLE_PASSWORDS: '0'
+    volumes:
+      - ./supabase/storage-migrations:/storage-migrations:ro
+      - ./docker/db/migrate.sh:/migrate.sh:ro
+    entrypoint: ['/bin/sh', '/migrate.sh']
+
   # ── Gateway ─────────────────────────────────────────────────────────────────
   # Bündelt auth/rest/storage unter einer Origin, wie supabase-js es erwartet.
   gateway:
@@ -214,6 +239,11 @@ services:
         condition: service_started
       storage:
         condition: service_started
+      # Erst wenn die Buckets stehen: sonst antwortet die Anwendung auf einen
+      # Upload mit "Bucket not found", und das sieht nach einem Fehler in der
+      # Anwendung aus statt nach einem noch nicht fertigen Stack.
+      storage-init:
+        condition: service_completed_successfully
     volumes:
       - ./docker/caddy/Caddyfile.dev:/etc/caddy/Caddyfile:ro
       - caddy-data:/data
