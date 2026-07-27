@@ -1,8 +1,10 @@
 'use client';
 
 import { segmentAnswer, type Citation } from '@nlm/shared';
-import { ArrowUp, MessageSquareQuote, Square } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { ArrowUp, Check, MessageSquareQuote, Square, StickyNote } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState, useTransition } from 'react';
+
+import { saveAnswerAsNote } from '@/app/(app)/notebooks/[id]/studio/actions';
 
 import { CitationChip } from '@/components/chat/citation-chip';
 import { useSourceSelection } from '@/components/notebooks/source-selection';
@@ -213,6 +215,7 @@ export function ChatPanel({
               <MessageBubble
                 key={String(message.id)}
                 message={message}
+                notebookId={notebookId}
                 onOpenCitation={openCitation}
               />
             ))}
@@ -231,6 +234,7 @@ export function ChatPanel({
                     content: streamed,
                     citations: [],
                   }}
+                  notebookId={notebookId}
                   onOpenCitation={openCitation}
                   showCaret={streamed.length === 0 || streaming}
                 />
@@ -336,10 +340,12 @@ export function ChatPanel({
 
 function MessageBubble({
   message,
+  notebookId,
   onOpenCitation,
   showCaret = false,
 }: {
   readonly message: ChatMessage;
+  readonly notebookId: string;
   readonly onOpenCitation: (citation: Citation) => void;
   readonly showCaret?: boolean;
 }) {
@@ -404,6 +410,14 @@ function MessageBubble({
           ))}
         </div>
       )}
+
+      {/*
+        Nur bei gespeicherten Antworten: eine noch laufende hat keine ID, und
+        eine halbe Antwort als Notiz zu sichern ergibt keinen Sinn.
+      */}
+      {typeof message.id === 'number' && !showCaret && (
+        <SaveAsNote messageId={message.id} notebookId={notebookId} />
+      )}
     </div>
   );
 }
@@ -456,6 +470,59 @@ function EmptyChat({
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+/**
+ * Übernimmt eine Antwort als Notiz — samt ihrer Belege.
+ *
+ * Die Zitate holt der Server aus der gespeicherten Nachricht, nicht aus dem,
+ * was der Browser gerade anzeigt. Was gespeichert wurde, ist die Wahrheit.
+ */
+function SaveAsNote({
+  messageId,
+  notebookId,
+}: {
+  readonly messageId: number;
+  readonly notebookId: string;
+}) {
+  const [pending, startTransition] = useTransition();
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  if (saved) {
+    return (
+      <p className="text-muted-foreground mt-2 flex items-center gap-1.5 text-xs">
+        <Check className="size-3.5" aria-hidden />
+        Als Notiz gespeichert
+      </p>
+    );
+  }
+
+  return (
+    <div className="mt-2">
+      <Button
+        variant="ghost"
+        size="sm"
+        loading={pending}
+        onClick={() => {
+          setError(null);
+          startTransition(async () => {
+            const result = await saveAnswerAsNote(messageId, notebookId);
+            if (result.error) setError(result.error);
+            else setSaved(true);
+          });
+        }}
+      >
+        <StickyNote aria-hidden />
+        Als Notiz speichern
+      </Button>
+      {error && (
+        <p role="alert" className="text-destructive mt-1 text-xs">
+          {error}
+        </p>
+      )}
     </div>
   );
 }

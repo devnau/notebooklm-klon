@@ -1,7 +1,9 @@
+import Anthropic from '@anthropic-ai/sdk';
 import { JOB_LEASE_SECONDS, JOB_POLL_INTERVAL_MS } from '@nlm/shared';
 import { createClient } from '@supabase/supabase-js';
 import { pino } from 'pino';
 
+import { generateArtifact, type ArtifactPayload } from './handlers/generate-artifact.js';
 import { ingestSource, type IngestPayload } from './handlers/ingest-source.js';
 import { loadConfig } from './lib/config.js';
 import { EmbeddingClient } from './lib/embeddings.js';
@@ -49,6 +51,22 @@ const embeddings = new EmbeddingClient({
     );
   },
 });
+
+/*
+ * Erst beim ersten Bedarf erzeugt: der Import von Quellen braucht Anthropic
+ * nicht, und ein Worker, der nur importiert, soll ohne diesen Schlüssel laufen.
+ */
+let anthropicClient: Anthropic | null = null;
+
+function anthropic(): Anthropic {
+  if (!config.ANTHROPIC_API_KEY) {
+    throw new Error(
+      'ANTHROPIC_API_KEY fehlt — ohne ihn lassen sich keine Übersichten erzeugen.',
+    );
+  }
+  anthropicClient ??= new Anthropic({ apiKey: config.ANTHROPIC_API_KEY });
+  return anthropicClient;
+}
 
 type ClaimedJob = {
   readonly job_id: number;
@@ -139,9 +157,16 @@ async function runJob(job: ClaimedJob): Promise<void> {
           logger: log,
         });
         break;
-      // generate_artifact und render_audio folgen in Phase 4 und 5. Ein
-      // unbekannter Job wird als fehlgeschlagen markiert statt endlos
-      // wiederholt — sonst blockiert er die Warteschlange.
+      case 'generate_artifact':
+        await generateArtifact(job.payload as unknown as ArtifactPayload, {
+          supabase,
+          anthropic: anthropic(),
+          logger: log,
+        });
+        break;
+      // render_audio folgt in Phase 5. Ein unbekannter Job wird als
+      // fehlgeschlagen markiert statt endlos wiederholt — sonst blockiert er
+      // die Warteschlange.
       default:
         await finishJob(job.job_id, 'failed', `Unbekannter Job-Typ: ${job.kind}`);
         log.error('Unbekannter Job-Typ');

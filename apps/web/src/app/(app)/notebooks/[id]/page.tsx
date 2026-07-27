@@ -1,11 +1,11 @@
 import { hasAtLeastRole, notebookRoleSchema, type Citation } from '@nlm/shared';
-import { Sparkles } from 'lucide-react';
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 
 import { ChatPanel, type ChatMessage } from '@/components/chat/chat-panel';
 import { NotebookHeader } from '@/components/notebooks/notebook-header';
 import { SourceSelectionProvider } from '@/components/notebooks/source-selection';
+import { StudioPanel, type ArtifactRow } from '@/components/studio/studio-panel';
 import { SourcesPanel, type SourceRow } from '@/components/sources/sources-panel';
 import { WorkspaceShell } from '@/components/layout/workspace-shell';
 import { createClient } from '@/lib/supabase/server';
@@ -94,6 +94,19 @@ export default async function NotebookPage({ params }: Params) {
     citations: (message.citations ?? []) as unknown as Citation[],
   }));
 
+  const [{ data: artifacts }, { data: notes }] = await Promise.all([
+    supabase
+      .from('artifacts')
+      .select('id, kind, status, payload, error, source_ids')
+      .eq('notebook_id', id),
+    supabase
+      .from('notes')
+      .select('id, title, content, kind, citations, updated_at')
+      .eq('notebook_id', id)
+      .order('updated_at', { ascending: false })
+      .limit(200),
+  ]);
+
   const readySourceIds = (sources ?? [])
     .filter((source) => source.status === 'ready')
     .map((source) => source.id);
@@ -126,41 +139,17 @@ export default async function NotebookPage({ params }: Params) {
               readySourceIds={readySourceIds}
             />
           }
-          studio={<StudioPlaceholder />}
+          studio={
+            <StudioPanel
+              notebookId={id}
+              role={role}
+              initialArtifacts={(artifacts ?? []) as ArtifactRow[]}
+              initialNotes={notes ?? []}
+              readySourceIds={readySourceIds}
+            />
+          }
         />
       </SourceSelectionProvider>
     </>
-  );
-}
-
-function StudioPlaceholder() {
-  return (
-    <div className="border-t p-4 lg:border-t-0 lg:border-l">
-      <h2 className="mb-3 flex items-center gap-2 text-sm font-medium">
-        <Sparkles className="text-muted-foreground size-4" aria-hidden />
-        Studio
-      </h2>
-      <ul className="flex flex-col gap-2">
-        {[
-          'Zusammenfassung',
-          'Lernleitfaden',
-          'FAQ',
-          'Zeitleiste',
-          'Briefing',
-          'Mindmap',
-          'Audio-Überblick',
-        ].map((item) => (
-          <li
-            key={item}
-            className="text-muted-foreground rounded-md border border-dashed px-3 py-2.5 text-sm"
-          >
-            {item}
-          </li>
-        ))}
-      </ul>
-      <p className="text-muted-foreground mt-3 text-xs">
-        Ab Phase 4 verfügbar, sobald Quellen indexiert sind.
-      </p>
-    </div>
   );
 }

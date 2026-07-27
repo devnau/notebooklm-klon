@@ -337,6 +337,85 @@ async function main() {
     `cache_read_input_tokens: ${cacheRead}`,
   );
 
+  // ── Studio-Artefakte ─────────────────────────────────────────────────────
+  /*
+   * Geprüft wird nicht der Inhalt — der ist nicht deterministisch —, sondern
+   * dass die Struktur stimmt und die Belege auf echte Abschnitte zeigen. Ein
+   * Artefakt mit erfundenen Verweisen sähe genauso aus wie ein gutes.
+   */
+  console.log('\n→ Studio-Artefakte');
+
+  for (const kind of ['summary', 'timeline', 'mindmap']) {
+    /*
+     * Über PostgREST mit dem Token des Nutzers, nicht per psql. Die Funktion
+     * prüft `auth.uid()`; als Datenbank-Superuser ist die leer, und der Aufruf
+     * scheitert mit „Keine Berechtigung" — was zunächst wie ein Fehler in der
+     * Funktion aussah und keiner war. Nebenbei prüft dieser Weg auch das
+     * EXECUTE-Recht für `authenticated`.
+     */
+    const response = await fetch(`${GATEWAY}/rest/v1/rpc/request_artifact`, {
+      method: 'POST',
+      headers: {
+        apikey: ANON,
+        Authorization: `Bearer ${session.access_token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ p_notebook: notebookId, p_kind: kind }),
+    });
+    const artifactId = (await response.text()).replace(/"/g, '').trim();
+
+    if (!/^[0-9a-f-]{36}$/.test(artifactId)) {
+      check(
+        `${kind}: angefordert`,
+        false,
+        `HTTP ${response.status}: ${artifactId.slice(0, 200)}`,
+      );
+      continue;
+    }
+
+    const deadline = Date.now() + 300_000;
+    let status = '';
+    while (Date.now() < deadline) {
+      status = psql(`select status from public.artifacts where id = '${artifactId}';`);
+      if (status === 'ready' || status === 'failed') break;
+      await sleep(3000);
+    }
+
+    if (status !== 'ready') {
+      const detail = psql(
+        `select coalesce(error, '(ohne Meldung)') from public.artifacts where id = '${artifactId}';`,
+      );
+      check(`${kind}: erzeugt`, false, `Status ${status}: ${detail}`);
+      continue;
+    }
+
+    const payload = JSON.parse(
+      psql(`select payload::text from public.artifacts where id = '${artifactId}';`),
+    );
+
+    check(`${kind}: erzeugt`, true, describePayload(kind, payload));
+
+    /*
+     * Der Prüfpunkt, der zählt: jeder Beleg im Artefakt zeigt auf einen
+     * Abschnitt, den es in diesem Notizbuch wirklich gibt. Ohne diese Prüfung
+     * fiele eine erfundene Nummer niemandem auf — die Oberfläche würde sie
+     * schlicht weglassen.
+     */
+    const resolved = payload.resolvedCitations ?? [];
+    const echt = resolved.every((citation) => {
+      const found = psql(`
+        select count(*) from public.chunks
+        where id = ${Number(citation.chunkId)} and notebook_id = '${notebookId}';
+      `);
+      return found === '1';
+    });
+    check(
+      `${kind}: Belege zeigen auf echte Abschnitte`,
+      echt,
+      `${resolved.length} Beleg(e)`,
+    );
+  }
+
   console.log('\n→ Aufräumen ...');
   psql(`delete from public.notebooks where id = '${notebookId}';`);
   psql(`delete from auth.users where email = '${EMAIL}';`);
@@ -347,6 +426,14 @@ async function main() {
       : `\n✗ ${failures} Prüfung(en) fehlgeschlagen.`,
   );
   process.exit(failures === 0 ? 0 : 1);
+}
+
+/** Kurzbeschreibung des Ergebnisses, damit der Lauf nachvollziehbar ist. */
+function describePayload(kind, payload) {
+  if (kind === 'summary') return `${payload.sections?.length ?? 0} Abschnitte`;
+  if (kind === 'timeline') return `${payload.events?.length ?? 0} Ereignisse`;
+  if (kind === 'mindmap') return `${payload.nodes?.length ?? 0} Knoten`;
+  return '';
 }
 
 /** Einfachanführungszeichen für psql verdoppeln. */

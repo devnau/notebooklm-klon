@@ -12,6 +12,7 @@
     "clean": "rm -rf dist *.tsbuildinfo"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.115.0",
     "@mozilla/readability": "^0.6.0",
     "@nlm/shared": "*",
     "@supabase/supabase-js": "^2.110.8",
