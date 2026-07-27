@@ -359,6 +359,127 @@ await check('letzter Owner kann nicht entfernt werden', () => {
   assert(remaining === '1', `Mitgliedschaften nach Abbruch: ${remaining} (erwartet 1)`);
 });
 
+console.log('\nChat und Retrieval');
+
+await check('match_chunks liefert bei fremdem Notizbuch nichts', () => {
+  /*
+   * Die Falle bei RAG: die Zugriffsprüfung sitzt in der Anwendung, und die
+   * Suchfunktion umgeht sie. match_chunks ist deshalb `security invoker` — RLS
+   * auf chunks entscheidet, was sie sieht. Geprüft mit einem Nullvektor: es
+   * geht nicht um Trefferqualität, sondern darum, dass gar nichts kommt.
+   */
+  const zero = `[${Array.from({ length: 1024 }, () => '0').join(',')}]`;
+  const rows = psql(`
+    select count(*) from public.match_chunks(
+      gen_random_uuid(), 'irgendetwas', '${zero}'::extensions.vector(1024), null, 10, 60
+    )
+  `);
+  assert(rows === '0', `Datenleck: ${rows} Abschnitt(e) aus fremdem Notizbuch`);
+});
+
+await check('match_chunks ist nicht security definer', () => {
+  // Eine spätere Änderung auf `security definer` würde die Prüfung oben
+  // aushebeln, ohne dass sie rot wird — der Aufruf käme dann als Eigentümer
+  // und sähe alles. Deshalb wird die Eigenschaft selbst geprüft.
+  const isDefiner = psql(`
+    select prosecdef from pg_proc p
+    join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public' and p.proname = 'match_chunks'
+  `);
+  assert(isDefiner === 'f', 'match_chunks läuft als security definer');
+});
+
+await check('fremder Nutzer sieht Unterhaltungen und Nachrichten nicht', async () => {
+  assert(state.user, 'Voraussetzung fehlt: kein angemeldeter Nutzer');
+  assert(state.notebookId, 'Voraussetzung fehlt: kein Notebook');
+
+  const chatId = psql(`
+    insert into public.chats (notebook_id, title, created_by)
+    values ('${state.notebookId}', 'Geheime Unterhaltung', '${state.user.userId}')
+    returning id
+  `).split('\n')[0];
+
+  psql(`
+    insert into public.messages (chat_id, notebook_id, role, content, created_by)
+    values ('${chatId}', '${state.notebookId}', 'user', 'Vertrauliche Frage', '${state.user.userId}')
+  `);
+
+  const other = await createUser();
+
+  for (const table of ['chats', 'messages']) {
+    const response = await request(
+      `${GATEWAY}/rest/v1/${table}?select=id&notebook_id=eq.${state.notebookId}`,
+      { headers: { apikey: ANON, Authorization: `Bearer ${other.token}` } },
+    );
+    assert(Array.isArray(response.json), `${table}: ${response.text.slice(0, 200)}`);
+    assert(
+      response.json.length === 0,
+      `Datenleck in ${table}: fremder Nutzer sah ${response.json.length} Zeile(n)`,
+    );
+  }
+
+  state.chatId = chatId;
+  return 'beide Tabellen dicht';
+});
+
+await check('fremder Nutzer kann keine Frage in fremdem Notizbuch stellen', async () => {
+  assert(state.chatId, 'Voraussetzung fehlt: keine Unterhaltung');
+  const other = await createUser();
+
+  const response = await request(`${GATEWAY}/rest/v1/messages`, {
+    method: 'POST',
+    headers: {
+      apikey: ANON,
+      Authorization: `Bearer ${other.token}`,
+      'Content-Type': 'application/json',
+      Prefer: 'return=representation',
+    },
+    body: JSON.stringify({
+      chat_id: state.chatId,
+      notebook_id: state.notebookId,
+      role: 'user',
+      content: 'Untergeschoben',
+    }),
+  });
+
+  assert(!response.ok, `Insert wurde akzeptiert: HTTP ${response.status}`);
+  const count = psql(
+    `select count(*) from public.messages where content = 'Untergeschoben'`,
+  );
+  assert(count === '0', `Datenleck: ${count} untergeschobene Nachricht(en)`);
+  return `abgewiesen mit HTTP ${response.status}`;
+});
+
+await check('Nachrichten sind unveränderlich', async () => {
+  /*
+   * Eine Antwort samt Zitaten ist ein Protokoll: sie hält fest, was das Modell
+   * auf Basis welcher Auszüge gesagt hat. Liesse sie sich nachträglich ändern,
+   * wäre sie als Beleg wertlos — und der Unterschied fiele niemandem auf.
+   */
+  assert(state.user, 'Voraussetzung fehlt: kein angemeldeter Nutzer');
+  const response = await request(
+    `${GATEWAY}/rest/v1/messages?notebook_id=eq.${state.notebookId}`,
+    {
+      method: 'PATCH',
+      headers: {
+        apikey: ANON,
+        Authorization: `Bearer ${state.user.token}`,
+        'Content-Type': 'application/json',
+        Prefer: 'return=representation',
+      },
+      body: JSON.stringify({ content: 'nachträglich geändert' }),
+    },
+  );
+
+  const changed = Array.isArray(response.json) ? response.json.length : 0;
+  assert(changed === 0, `${changed} Nachricht(en) nachträglich geändert`);
+  const tampered = psql(
+    `select count(*) from public.messages where content = 'nachträglich geändert'`,
+  );
+  assert(tampered === '0', 'Nachricht liess sich ändern');
+  return 'auch der Eigentümer kann nicht ändern';
+});
+
 console.log(
   failures === 0
     ? '\n✓ Alle Prüfungen bestanden.\n'
