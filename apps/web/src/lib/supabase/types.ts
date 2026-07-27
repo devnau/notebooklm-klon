@@ -7,6 +7,62 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      artifacts: {
+        Row: {
+          created_at: string;
+          created_by: string | null;
+          error: string | null;
+          id: string;
+          input_tokens: number | null;
+          kind: string;
+          notebook_id: string;
+          output_tokens: number | null;
+          payload: Json | null;
+          source_ids: string[] | null;
+          status: string;
+          storage_path: string | null;
+          updated_at: string;
+        };
+        Insert: {
+          created_at?: string;
+          created_by?: string | null;
+          error?: string | null;
+          id?: string;
+          input_tokens?: number | null;
+          kind: string;
+          notebook_id: string;
+          output_tokens?: number | null;
+          payload?: Json | null;
+          source_ids?: string[] | null;
+          status?: string;
+          storage_path?: string | null;
+          updated_at?: string;
+        };
+        Update: {
+          created_at?: string;
+          created_by?: string | null;
+          error?: string | null;
+          id?: string;
+          input_tokens?: number | null;
+          kind?: string;
+          notebook_id?: string;
+          output_tokens?: number | null;
+          payload?: Json | null;
+          source_ids?: string[] | null;
+          status?: string;
+          storage_path?: string | null;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'artifacts_notebook_id_fkey';
+            columns: ['notebook_id'];
+            isOneToOne: false;
+            referencedRelation: 'notebooks';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       chats: {
         Row: {
           created_at: string;
@@ -283,6 +339,60 @@ export type Database = {
         };
         Relationships: [];
       };
+      notes: {
+        Row: {
+          citations: Json;
+          content: string;
+          created_at: string;
+          created_by: string | null;
+          id: string;
+          kind: string;
+          notebook_id: string;
+          source_message_id: number | null;
+          title: string;
+          updated_at: string;
+        };
+        Insert: {
+          citations?: Json;
+          content?: string;
+          created_at?: string;
+          created_by?: string | null;
+          id?: string;
+          kind?: string;
+          notebook_id: string;
+          source_message_id?: number | null;
+          title?: string;
+          updated_at?: string;
+        };
+        Update: {
+          citations?: Json;
+          content?: string;
+          created_at?: string;
+          created_by?: string | null;
+          id?: string;
+          kind?: string;
+          notebook_id?: string;
+          source_message_id?: number | null;
+          title?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'notes_notebook_id_fkey';
+            columns: ['notebook_id'];
+            isOneToOne: false;
+            referencedRelation: 'notebooks';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'notes_source_message_id_fkey';
+            columns: ['source_message_id'];
+            isOneToOne: false;
+            referencedRelation: 'messages';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       profiles: {
         Row: {
           created_at: string;
@@ -438,6 +548,10 @@ export type Database = {
           source_id: string;
           vector_rank: number;
         }[];
+      };
+      request_artifact: {
+        Args: { p_kind: string; p_notebook: string };
+        Returns: string;
       };
       requeue_stale_jobs: { Args: { lease_seconds?: number }; Returns: number };
       retry_source: { Args: { p_source_id: string }; Returns: undefined };
