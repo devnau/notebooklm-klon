@@ -30,6 +30,11 @@ const supabase = createClient(config.SUPABASE_URL, config.SUPABASE_SERVICE_ROLE_
 
 const ergebnis = await cleanupOrphans(supabase, logger);
 
-// Maschinenlesbar auf stdout, damit die Probe das Ergebnis auswerten kann,
-// ohne das Protokollformat zu kennen.
+/*
+ * Maschinenlesbar auf stdout, damit die Probe das Ergebnis auswerten kann, ohne
+ * das Protokollformat zu kennen. `console.log` ist im Rest des Projekts
+ * verboten — hier ist es die Schnittstelle, nicht eine vergessene
+ * Fehlersuchzeile.
+ */
+// eslint-disable-next-line no-console
 console.log(`ERGEBNIS ${JSON.stringify(ergebnis)}`);
