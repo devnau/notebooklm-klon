@@ -68,8 +68,14 @@ export default defineConfig({
      * Wartezeit. Die Tests scheiterten damit an der Übersetzung, nicht an der
      * Anwendung.
      *
-     * Nebenbei prüft die CI so das, was tatsächlich ausgeliefert wird. Lokal
-     * bleibt der Dev-Server, weil ein Build vor jedem Testlauf die
+     * Gestartet wird über `node apps/web/server.js` — dieselbe Zeile wie im
+     * Produktionsimage. `next start` warnt bei `output: standalone`
+     * ausdrücklich, dass es dafür nicht vorgesehen ist, und liefert trotzdem
+     * aus; damit würde die CI einen anderen Server prüfen als den
+     * ausgelieferten. Die Kopierschritte für `.next/static` und `public`
+     * stecken in scripts/start-standalone.sh.
+     *
+     * Lokal bleibt der Dev-Server, weil ein Build vor jedem Testlauf die
      * Rückkopplung zerstören würde.
      *
      * @nlm/shared wird über das exports-Feld aus dist/ geladen. In einem
@@ -78,7 +84,7 @@ export default defineConfig({
      * liegt. Genau daran ist der E2E-Job in der CI schon einmal gescheitert.
      */
     command: process.env.CI
-      ? 'npm run build --workspace=@nlm/shared && npm run build --workspace=@nlm/web && npm run start --workspace=@nlm/web'
+      ? 'npm run build --workspace=@nlm/shared && npm run build --workspace=@nlm/web && npm run start:standalone'
       : 'npm run build --workspace=@nlm/shared && npm run dev --workspace=@nlm/web',
     url: 'http://localhost:3000/anmelden',
     reuseExistingServer: !process.env.CI,

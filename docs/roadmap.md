@@ -273,16 +273,31 @@ herzustellen.
   abgleichen, Verwaiste über die Storage-API entfernen. Das ist auch ein
   Datenschutzthema — ein gelöschtes Notizbuch soll gelöscht sein.
 - **`ffmpeg` ins Worker-Image**, sobald der Worker containerisiert wird.
-- **Standalone-Server statt `next start`.** Die Anwendung baut mit
-  `output: standalone`; `next start` warnt dabei ausdrücklich, dass das nicht
-  vorgesehen ist, und liefert trotzdem aus. Für das Produktionsimage ist
-  `node .next/standalone/server.js` der richtige Weg — mit den Kopierschritten
-  für `.next/static` und `public`. Sobald das steht, sollte auch der
-  Playwright-Lauf in der CI darauf umgestellt werden, damit dort genau das
-  läuft, was ausgeliefert wird.
-- i18n (de, en), Rate-Limits, Kostenerfassung in `llm_usage`
-- `pino`-Logging, `/api/health` mit DB-, Storage- und Worker-Prüfung
-- `docker-compose.prod.yml` mit Caddy, TLS, CSP und HSTS
-- Backup-Skript und einmal echt geprobter Restore
-- Accessibility-Durchgang mit axe, Performance, Bundle-Analyse
+  **Fertig:**
+
+- Produktionsimages für Anwendung und Worker, beide gebaut und gestartet
+- `docker-compose.prod.yml`: nur Caddy erreichbar, TLS über Let's Encrypt,
+  HSTS, Ressourcengrenzen
+- Content-Security-Policy mit Nonce je Anfrage, geprüft gegen den
+  Produktionsbuild
+- `/api/health` mit Datenbank-, Storage- und Warteschlangenprüfung
+- Rate-Limits für Fragen, Uploads, Übersichten und Audio; Kostenerfassung in
+  `llm_usage`
+- Aufräumjob für verwaiste Storage-Dateien, geprüft gegen echte Dateien
+- Sicherung und **einmal echt durchgespielte** Restore-Probe
+- Standalone-Server im E2E-Lauf — dieselbe Startzeile wie im Image
 - `docs/deployment.md`, `docs/operations.md`
+
+**Offen:**
+
+- **i18n (de, en).** Die Oberfläche ist durchgehend deutsch, die Texte stehen
+  inline. Eine Umstellung auf `next-intl` heisst, mehrere hundert Zeichenketten
+  zu extrahieren — eine mechanische Änderung mit echtem Regressionsrisiko, und
+  zwar an jeder Stelle gleichzeitig. Sie gehört an den Anfang einer Phase, nicht
+  ans Ende. Vorbereitet ist der Weg: die Notebook-Sprache steuert schon
+  Prompts, Stimmen und Volltextkonfiguration.
+- Accessibility-Durchgang über die neuen Ansichten (Studio, Audio-Player);
+  `axe-core` läuft bisher auf Anmeldung, Übersicht und Arbeitsfläche
+- Bundle-Analyse; Mermaid ist nachgeladen, der Rest ungemessen
+- Off-Site-Backup, Monitoring, Fehlererfassung — siehe „Was nicht überwacht
+  wird" in `docs/operations.md`
