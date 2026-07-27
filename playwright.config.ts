@@ -22,7 +22,15 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   reporter: process.env.CI ? [['github'], ['html', { open: 'never' }]] : [['list']],
   timeout: 30_000,
-  expect: { timeout: 7_000 },
+  /*
+   * In der CI grosszügiger. Der Läufer teilt sich die Maschine mit dem
+   * gesamten Docker-Stack; eine Seite, die lokal in 300 ms steht, braucht dort
+   * gelegentlich mehrere Sekunden. Ein Test, der daran scheitert, meldet keinen
+   * Fehler in der Anwendung, sondern verbrennt Zeit mit Wiederholungen.
+   *
+   * Lokal bleibt es knapp: dort soll ein träger Aufruf auffallen.
+   */
+  expect: { timeout: process.env.CI ? 15_000 : 7_000 },
 
   use: {
     baseURL: process.env.PLAYWRIGHT_BASE_URL ?? 'http://localhost:3000',

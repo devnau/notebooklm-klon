@@ -41,41 +41,62 @@ export default async function NotebookPage({ params }: Params) {
 
   if (!notebook) notFound();
 
-  const { data: membership } = await supabase
-    .from('notebook_members')
-    .select('role')
-    .eq('notebook_id', id)
-    .maybeSingle();
+  /*
+   * Ab hier alles nebenläufig, was nicht voneinander abhängt.
+   *
+   * Nacheinander waren es fünf Rundreisen zur Datenbank, bevor die Seite
+   * überhaupt zu rendern begann — auf einer schnellen Maschine unauffällig,
+   * auf einem ausgelasteten CI-Läufer der Unterschied zwischen bestandenem und
+   * fehlgeschlagenem Test. Und der Nutzer wartet genauso.
+   */
+  const [
+    { data: membership },
+    { data: sources },
+    { data: chat },
+    { data: artifacts },
+    { data: notes },
+  ] = await Promise.all([
+    supabase.from('notebook_members').select('role').eq('notebook_id', id).maybeSingle(),
+    /*
+     * Die Quellen kommen vom Server, damit die Spalte beim ersten Aufruf
+     * gefüllt ist. Alles Weitere — Statuswechsel während des Imports — läuft
+     * danach über Realtime im Client-Teil.
+     */
+    supabase
+      .from('sources')
+      .select('id, kind, title, status, error, page_count, char_count, created_at')
+      .eq('notebook_id', id)
+      .order('created_at', { ascending: false }),
+    /*
+     * Die zuletzt bearbeitete Unterhaltung wird fortgesetzt. Bei jedem Aufruf
+     * eine neue anzulegen würde den Verlauf in unzusammenhängende Fragmente
+     * zerlegen — und der Verlauf ist es, der Rückfragen erst möglich macht.
+     */
+    supabase
+      .from('chats')
+      .select('id')
+      .eq('notebook_id', id)
+      .order('updated_at', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    supabase
+      .from('artifacts')
+      .select('id, kind, status, payload, error, source_ids')
+      .eq('notebook_id', id),
+    supabase
+      .from('notes')
+      .select('id, title, content, kind, citations, updated_at')
+      .eq('notebook_id', id)
+      .order('updated_at', { ascending: false })
+      .limit(200),
+  ]);
 
   // Der generierte Typ kennt nur `string`, weil die Rolle in der Datenbank per
   // CHECK-Constraint eingegrenzt ist und nicht als Enum-Typ. Das Schema aus
   // @nlm/shared spiegelt dieselben Werte und macht daraus wieder einen Typ.
   const role = notebookRoleSchema.catch('viewer').parse(membership?.role);
 
-  /*
-   * Die Quellen kommen vom Server, damit die Spalte beim ersten Aufruf gefüllt
-   * ist. Alles Weitere — Statuswechsel während des Imports — läuft danach über
-   * Realtime im Client-Teil.
-   */
-  const { data: sources } = await supabase
-    .from('sources')
-    .select('id, kind, title, status, error, page_count, char_count, created_at')
-    .eq('notebook_id', id)
-    .order('created_at', { ascending: false });
-
-  /*
-   * Die zuletzt bearbeitete Unterhaltung wird fortgesetzt. Bei jedem Aufruf
-   * eine neue anzulegen würde den Verlauf in unzusammenhängende Fragmente
-   * zerlegen — und der Verlauf ist es, der Rückfragen erst möglich macht.
-   */
-  const { data: chat } = await supabase
-    .from('chats')
-    .select('id')
-    .eq('notebook_id', id)
-    .order('updated_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
+  // Hängt an `chat` und lässt sich deshalb als Einziges nicht parallelisieren.
   const { data: history } = chat
     ? await supabase
         .from('messages')
@@ -93,19 +114,6 @@ export default async function NotebookPage({ params }: Params) {
     // wird beim Schreiben in der Chat-Route festgelegt.
     citations: (message.citations ?? []) as unknown as Citation[],
   }));
-
-  const [{ data: artifacts }, { data: notes }] = await Promise.all([
-    supabase
-      .from('artifacts')
-      .select('id, kind, status, payload, error, source_ids')
-      .eq('notebook_id', id),
-    supabase
-      .from('notes')
-      .select('id, title, content, kind, citations, updated_at')
-      .eq('notebook_id', id)
-      .order('updated_at', { ascending: false })
-      .limit(200),
-  ]);
 
   const readySourceIds = (sources ?? [])
     .filter((source) => source.status === 'ready')

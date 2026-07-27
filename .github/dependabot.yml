@@ -11,6 +11,14 @@ updates:
       minor-and-patch:
         patterns: ['*']
         update-types: ['minor', 'patch']
+    ignore:
+      # TypeScript 7 ist zwar aktuell, aber typescript-eslint@8 verlangt
+      # `<6.1.0` als Peer — `npm ci` scheitert dann mit ERESOLVE, und zwar
+      # nicht im Lint-Job, sondern schon bei der Installation in jedem Job.
+      # Begründung und Ausstiegspfad in docs/adr/0007-typescript-5-statt-7.md.
+      # Zu entfernen, sobald typescript-eslint 8 nachzieht.
+      - dependency-name: typescript
+        update-types: ['version-update:semver-major']
     commit-message:
       prefix: 'chore(deps)'
 
