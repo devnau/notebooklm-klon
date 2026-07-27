@@ -2,20 +2,18 @@
 
 import { hasAtLeastRole, type NotebookRole } from '@nlm/shared';
 import { FileText, Globe, RotateCcw, Trash2, Type } from 'lucide-react';
-import { useEffect, useRef, useState, useTransition } from 'react';
+import { useState, useTransition } from 'react';
 
 import { deleteSource, retrySource } from '@/app/(app)/notebooks/[id]/sources/actions';
-import { useSourceSelection } from '@/components/notebooks/source-selection';
-import { AddSourceDialog } from '@/components/sources/add-source-dialog';
 import {
-  StatusPill,
-  statusAnnouncement,
-  type SourceStatus,
-} from '@/components/sources/status-pill';
+  useSourceSelection,
+  type SourceRow,
+} from '@/components/notebooks/source-selection';
+import { AddSourceDialog } from '@/components/sources/add-source-dialog';
+import { StatusPill } from '@/components/sources/status-pill';
 import { SourceViewer } from '@/components/sources/source-viewer';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
-import { createClient } from '@/lib/supabase/client';
 import { cn } from '@/lib/utils';
 
 /**
@@ -32,101 +30,20 @@ import { cn } from '@/lib/utils';
  * nicht, auch wenn er den Kanalnamen erriete.
  */
 
-export type SourceRow = {
-  readonly id: string;
-  readonly kind: string;
-  readonly title: string;
-  readonly status: SourceStatus;
-  readonly error: string | null;
-  readonly page_count: number | null;
-  readonly char_count: number | null;
-  readonly created_at: string;
-};
-
 export function SourcesPanel({
   notebookId,
   role,
-  initialSources,
 }: {
   readonly notebookId: string;
   readonly role: NotebookRole;
-  readonly initialSources: readonly SourceRow[];
 }) {
-  const [sources, setSources] = useState<readonly SourceRow[]>(initialSources);
-  const [announcement, setAnnouncement] = useState('');
-  const canEdit = hasAtLeastRole(role, 'editor');
-  const selection = useSourceSelection();
-
   /*
-   * Der Server-Zustand gewinnt, wenn die Seite neu gerendert wird (etwa nach
-   * revalidatePath). Ohne das bliebe eine gerade hinzugefügte Quelle
-   * unsichtbar, bis das Realtime-Ereignis eintrifft — und wäre doppelt zu
-   * sehen, falls beides kommt.
+   * Liste, Status und Realtime-Abo liegen im Provider — dieselbe Wahrheit, die
+   * Chat und Studio verwenden. Vorher hielt diese Spalte ihren Stand selbst,
+   * und das Studio erfuhr nie, dass eine Quelle fertig geworden war.
    */
-  useEffect(() => {
-    setSources(initialSources);
-  }, [initialSources]);
-
-  // Für die Ansage: den vorherigen Status je Quelle behalten, damit nur echte
-  // Übergänge vorgelesen werden und nicht jedes eintreffende Ereignis.
-  const previousStatus = useRef(new Map<string, SourceStatus>());
-
-  useEffect(() => {
-    const supabase = createClient();
-
-    /*
-     * Der Kanalname bekommt eine Zufallskomponente. `supabase.channel()` gibt
-     * bei gleichem Namen dieselbe Instanz zurück — und React ruft Effekte im
-     * Strict Mode zweimal auf. Der zweite Durchlauf träfe damit auf einen
-     * bereits abonnierten Kanal, auf dem `.on()` nicht mehr erlaubt ist:
-     * „cannot add postgres_changes callbacks after subscribe()". Der Abbau des
-     * ersten Kanals läuft asynchron und ist zu diesem Zeitpunkt nicht fertig.
-     *
-     * Der Name ist ohnehin nur ein lokaler Bezeichner; welche Zeilen jemand zu
-     * sehen bekommt, entscheidet die RLS-Policy auf `sources`, nicht der Name.
-     */
-    const channel = supabase
-      .channel(`sources:${notebookId}:${crypto.randomUUID()}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'sources',
-          filter: `notebook_id=eq.${notebookId}`,
-        },
-        (payload) => {
-          setSources((current) => {
-            if (payload.eventType === 'DELETE') {
-              const removed = payload.old as { id?: string };
-              return current.filter((entry) => entry.id !== removed.id);
-            }
-
-            const row = payload.new as SourceRow;
-            const before = previousStatus.current.get(row.id);
-            if (before !== row.status) {
-              previousStatus.current.set(row.id, row.status);
-              // Nur die Endzustände ansagen. „Wird gelesen" und „Wird
-              // indexiert" folgen dicht aufeinander; sie vorzulesen würde einen
-              // Screenreader-Nutzer beim Arbeiten unterbrechen, ohne ihm etwas
-              // zu sagen, das er nicht schon weiß.
-              if (row.status === 'ready' || row.status === 'failed') {
-                setAnnouncement(statusAnnouncement(row.title, row.status));
-              }
-            }
-
-            const index = current.findIndex((entry) => entry.id === row.id);
-            if (index === -1) return [row, ...current];
-            return current.map((entry) => (entry.id === row.id ? row : entry));
-          });
-        },
-      )
-      .subscribe();
-
-    return () => {
-      void supabase.removeChannel(channel);
-    };
-  }, [notebookId]);
+  const { sources, announcement } = useSourceSelection();
+  const canEdit = hasAtLeastRole(role, 'editor');
 
   return (
     <div className="flex min-h-0 flex-col gap-4 p-4">
@@ -138,11 +55,7 @@ export function SourcesPanel({
             <span className="text-muted-foreground font-normal">({sources.length})</span>
           )}
         </h2>
-        {selection.excluded.size > 0 && (
-          <Button variant="ghost" size="sm" onClick={selection.includeAll}>
-            Alle einbeziehen
-          </Button>
-        )}
+        <AlleEinbeziehen />
       </div>
 
       {canEdit && <AddSourceDialog notebookId={notebookId} />}
@@ -159,7 +72,7 @@ export function SourcesPanel({
           description={
             canEdit
               ? 'Lade ein PDF hoch, füge eine Adresse ein oder kopiere Text hierher. Danach kann der Chat sich darauf berufen.'
-              : 'In diesem Notebook liegen noch keine Quellen.'
+              : 'In diesem Notizbuch liegen noch keine Quellen.'
           }
         />
       ) : (
@@ -175,6 +88,17 @@ export function SourcesPanel({
         </ul>
       )}
     </div>
+  );
+}
+
+/** Erscheint nur, wenn überhaupt etwas abgewählt ist. */
+function AlleEinbeziehen() {
+  const { excluded, includeAll } = useSourceSelection();
+  if (excluded.size === 0) return null;
+  return (
+    <Button variant="ghost" size="sm" onClick={includeAll}>
+      Alle einbeziehen
+    </Button>
   );
 }
 

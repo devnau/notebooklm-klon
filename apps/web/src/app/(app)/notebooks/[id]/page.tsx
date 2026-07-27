@@ -4,9 +4,12 @@ import { notFound } from 'next/navigation';
 
 import { ChatPanel, type ChatMessage } from '@/components/chat/chat-panel';
 import { NotebookHeader } from '@/components/notebooks/notebook-header';
-import { SourceSelectionProvider } from '@/components/notebooks/source-selection';
+import {
+  SourceSelectionProvider,
+  type SourceRow,
+} from '@/components/notebooks/source-selection';
 import { StudioPanel, type ArtifactRow } from '@/components/studio/studio-panel';
-import { SourcesPanel, type SourceRow } from '@/components/sources/sources-panel';
+import { SourcesPanel } from '@/components/sources/sources-panel';
 import { WorkspaceShell } from '@/components/layout/workspace-shell';
 import { createClient } from '@/lib/supabase/server';
 
@@ -115,10 +118,6 @@ export default async function NotebookPage({ params }: Params) {
     citations: (message.citations ?? []) as unknown as Citation[],
   }));
 
-  const readySourceIds = (sources ?? [])
-    .filter((source) => source.status === 'ready')
-    .map((source) => source.id);
-
   return (
     <>
       <NotebookHeader notebook={notebook} role={role} />
@@ -128,23 +127,18 @@ export default async function NotebookPage({ params }: Params) {
         sie durchreichen könnte, existiert nicht — die Arbeitsfläche soll auf
         dem Server gerendert bleiben.
       */}
-      <SourceSelectionProvider>
+      <SourceSelectionProvider
+        notebookId={id}
+        initialSources={(sources ?? []) as SourceRow[]}
+      >
         <WorkspaceShell
-          sources={
-            <SourcesPanel
-              notebookId={id}
-              role={role}
-              initialSources={(sources ?? []) as SourceRow[]}
-            />
-          }
+          sources={<SourcesPanel notebookId={id} role={role} />}
           chat={
             <ChatPanel
               notebookId={id}
               initialMessages={messages}
               initialChatId={chat?.id ?? null}
               canAsk={hasAtLeastRole(role, 'editor')}
-              hasReadySources={readySourceIds.length > 0}
-              readySourceIds={readySourceIds}
             />
           }
           studio={
@@ -153,7 +147,6 @@ export default async function NotebookPage({ params }: Params) {
               role={role}
               initialArtifacts={(artifacts ?? []) as ArtifactRow[]}
               initialNotes={notes ?? []}
-              readySourceIds={readySourceIds}
             />
           }
         />

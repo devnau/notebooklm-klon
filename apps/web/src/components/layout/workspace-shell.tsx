@@ -17,6 +17,41 @@ const TABS: readonly { id: Pane; label: string; icon: typeof FileText }[] = [
 const PANEL_IDS = ['sources', 'chat', 'studio'];
 
 /**
+ * Speicher für die Spaltenbreiten, der auch auf dem Server funktioniert.
+ *
+ * `useDefaultLayout` greift standardmässig direkt auf `localStorage` zu — und
+ * zwar beim Rendern, nicht in einem Effekt. Auf dem Server gibt es das Objekt
+ * nicht, und Next bricht mit „localStorage is not defined" ab. Ein `'use
+ * client'` an der Datei hilft nicht: Client Components werden trotzdem
+ * serverseitig vorgerendert.
+ *
+ * Auf dem Server gibt der Speicher nichts zurück. Das ist genau richtig — dort
+ * ist unbekannt, welche Breiten dieser Nutzer eingestellt hat, und der Hook
+ * fällt dann auf die Standardaufteilung zurück. Sobald der Browser übernimmt,
+ * liest er den echten Wert.
+ */
+const layoutStorage = {
+  getItem(key: string): string | null {
+    if (typeof window === 'undefined') return null;
+    try {
+      return window.localStorage.getItem(key);
+    } catch {
+      // Privater Modus oder gesperrte Speicher: dann eben keine gespeicherten
+      // Breiten. Ein Absturz wäre die schlechtere Antwort.
+      return null;
+    }
+  },
+  setItem(key: string, value: string): void {
+    if (typeof window === 'undefined') return;
+    try {
+      window.localStorage.setItem(key, value);
+    } catch {
+      /* siehe oben */
+    }
+  },
+};
+
+/**
  * Dreispaltiges Arbeitslayout: Quellen, Chat, Studio.
  *
  * Ab `lg` drei Spalten mit verschiebbaren Trennern, deren Breiten erhalten
@@ -46,6 +81,7 @@ export function WorkspaceShell({
     id: 'nlm:workspace',
     panelIds: PANEL_IDS,
     onlySaveAfterUserInteractions: true,
+    storage: layoutStorage,
   });
 
   return (

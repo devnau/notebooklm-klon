@@ -20,12 +20,13 @@ import {
 import { useEffect, useState, useTransition } from 'react';
 
 import { deleteArtifact, requestArtifact } from '@/app/(app)/notebooks/[id]/studio/actions';
+import { useSourceSelection } from '@/components/notebooks/source-selection';
 import { SourceViewer, type TextRange } from '@/components/sources/source-viewer';
 import { ArtifactView } from '@/components/studio/artifact-view';
 import { AudioOverview } from '@/components/studio/audio-overview';
 import { NotesSection, type NoteRow } from '@/components/studio/notes-section';
 import { Button } from '@/components/ui/button';
-import { createClient } from '@/lib/supabase/client';
+import { subscribeToTable } from '@/lib/supabase/realtime';
 import { cn } from '@/lib/utils';
 
 /**
@@ -51,14 +52,19 @@ export function StudioPanel({
   role,
   initialArtifacts,
   initialNotes,
-  readySourceIds,
 }: {
   readonly notebookId: string;
   readonly role: NotebookRole;
   readonly initialArtifacts: readonly ArtifactRow[];
   readonly initialNotes: readonly NoteRow[];
-  readonly readySourceIds: readonly string[];
 }) {
+  /*
+   * Aus dem Provider, nicht als Prop vom Server. Als Prop blieb der Wert stehen,
+   * sobald eine Quelle *während* der Sitzung fertig wurde — das Studio bestand
+   * dann weiter darauf, es gebe keine verarbeitete Quelle, während die
+   * Quellenspalte daneben „Bereit" zeigte.
+   */
+  const { readySourceIds } = useSourceSelection();
   const [artifacts, setArtifacts] = useState<readonly ArtifactRow[]>(initialArtifacts);
   const [viewer, setViewer] = useState<{
     sourceId: string;
@@ -73,37 +79,26 @@ export function StudioPanel({
 
   // Wie bei den Quellen: Statuswechsel kommen über Realtime, nicht über
   // Polling. Ein Lernleitfaden über zehn Dokumente braucht seine Zeit.
-  useEffect(() => {
-    const supabase = createClient();
-    const channel = supabase
-      .channel(`artifacts:${notebookId}:${crypto.randomUUID()}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'artifacts',
-          filter: `notebook_id=eq.${notebookId}`,
-        },
-        (change) => {
+  useEffect(
+    () =>
+      subscribeToTable<ArtifactRow>({
+        table: 'artifacts',
+        notebookId,
+        onChange: (change) => {
           setArtifacts((current) => {
             if (change.eventType === 'DELETE') {
               const removed = change.old as { id?: string };
               return current.filter((entry) => entry.id !== removed.id);
             }
-            const row = change.new as ArtifactRow;
+            const row = change.new;
             const index = current.findIndex((entry) => entry.id === row.id);
             if (index === -1) return [...current, row];
             return current.map((entry) => (entry.id === row.id ? row : entry));
           });
         },
-      )
-      .subscribe();
-
-    return () => {
-      void supabase.removeChannel(channel);
-    };
-  }, [notebookId]);
+      }),
+    [notebookId],
+  );
 
   const byKind = new Map(artifacts.map((artifact) => [artifact.kind, artifact]));
 

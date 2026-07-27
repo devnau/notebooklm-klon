@@ -3,7 +3,7 @@ import { headers } from 'next/headers';
 import { Instrument_Sans, JetBrains_Mono, Source_Serif_4 } from 'next/font/google';
 import type { ReactNode } from 'react';
 
-import { ThemeProvider } from '@/components/theme-provider';
+import { ThemeProvider, ThemeScript } from '@/components/theme-provider';
 
 import './globals.css';
 
@@ -77,8 +77,16 @@ export default async function RootLayout({ children }: { readonly children: Reac
       data-scroll-behavior="smooth"
       className={`${instrumentSans.variable} ${sourceSerif.variable} ${jetbrainsMono.variable}`}
     >
+      <head>
+        {/*
+          Vor allem anderen: setzt die Themenklasse, bevor der Browser das erste
+          Mal zeichnet. In einem Effekt käme es zu spät, und bei dunkler
+          Einstellung blitzte kurz die helle Oberfläche auf.
+        */}
+        <ThemeScript nonce={nonce} />
+      </head>
       <body className="min-h-dvh antialiased">
-        <ThemeProvider nonce={nonce}>
+        <ThemeProvider>
           <a
             href="#main"
             className="sr-only-focusable bg-primary text-primary-foreground fixed top-3 left-3 z-50 rounded-md px-3 py-2 text-sm font-medium"

@@ -1,7 +1,7 @@
 @import 'tailwindcss';
 
 /*
- * Dark Mode wird über eine Klasse gesteuert (next-themes), nicht über
+ * Dark Mode wird über eine Klasse gesteuert (components/theme-provider), nicht über
  * prefers-color-scheme allein — sonst kann der Nutzer nicht umschalten.
  */
 @custom-variant dark (&:where(.dark, .dark *));

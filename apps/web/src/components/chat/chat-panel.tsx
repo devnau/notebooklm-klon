@@ -45,16 +45,11 @@ export function ChatPanel({
   initialMessages,
   initialChatId,
   canAsk,
-  hasReadySources,
-  readySourceIds,
 }: {
   readonly notebookId: string;
   readonly initialMessages: readonly ChatMessage[];
   readonly initialChatId: string | null;
   readonly canAsk: boolean;
-  readonly hasReadySources: boolean;
-  /** Alle verarbeiteten Quellen — die Auswahl ergibt sich daraus abzüglich der abgewählten. */
-  readonly readySourceIds: readonly string[];
 }) {
   const [messages, setMessages] = useState<readonly ChatMessage[]>(initialMessages);
   const [chatId, setChatId] = useState(initialChatId);
@@ -68,7 +63,13 @@ export function ChatPanel({
     range: TextRange;
   } | null>(null);
 
+  /*
+   * Auch das aus dem Provider und nicht als Prop: wird die erste Quelle während
+   * der Sitzung fertig, muss der leere Chat aufhören zu behaupten, es gebe
+   * keine. Als Serverwert bliebe er stehen, bis jemand neu lädt.
+   */
   const selection = useSourceSelection();
+  const hasReadySources = selection.readySourceIds.length > 0;
   const abortRef = useRef<AbortController | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
 
@@ -106,7 +107,7 @@ export function ChatPanel({
 
       // Erst beim Absenden ausgewertet, nicht als Abhängigkeit: sonst würde
       // jede Änderung an der Auswahl diese Funktion neu erzeugen.
-      const sourceIds = selection.selectedIds(readySourceIds);
+      const sourceIds = selection.selectedIds();
 
       try {
         const response = await fetch('/api/chat', {
@@ -194,7 +195,7 @@ export function ChatPanel({
         abortRef.current = null;
       }
     },
-    [notebookId, chatId, selection, readySourceIds],
+    [notebookId, chatId, selection],
   );
 
   const submit = () => {

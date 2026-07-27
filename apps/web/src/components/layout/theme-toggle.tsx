@@ -1,7 +1,7 @@
 'use client';
 
 import { Monitor, Moon, Sun } from 'lucide-react';
-import { useTheme } from 'next-themes';
+import { useTheme } from '@/components/theme-provider';
 import { useEffect, useState } from 'react';
 
 import { Button } from '@/components/ui/button';
@@ -27,7 +27,7 @@ export function ThemeToggle() {
   // beim ersten Rendern das falsche Icon auf.
   useEffect(() => setMounted(true), []);
 
-  const current = (theme ?? 'system') as (typeof ORDER)[number];
+  const current = theme;
   const next = ORDER[(ORDER.indexOf(current) + 1) % ORDER.length] ?? 'system';
 
   const Icon = current === 'light' ? Sun : current === 'dark' ? Moon : Monitor;
