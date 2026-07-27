@@ -5,6 +5,7 @@ import { ArrowUp, MessageSquareQuote, Square } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { CitationChip } from '@/components/chat/citation-chip';
+import { useSourceSelection } from '@/components/notebooks/source-selection';
 import { SourceViewer, type TextRange } from '@/components/sources/source-viewer';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -43,14 +44,15 @@ export function ChatPanel({
   initialChatId,
   canAsk,
   hasReadySources,
-  selectedSourceIds,
+  readySourceIds,
 }: {
   readonly notebookId: string;
   readonly initialMessages: readonly ChatMessage[];
   readonly initialChatId: string | null;
   readonly canAsk: boolean;
   readonly hasReadySources: boolean;
-  readonly selectedSourceIds?: readonly string[] | undefined;
+  /** Alle verarbeiteten Quellen — die Auswahl ergibt sich daraus abzüglich der abgewählten. */
+  readonly readySourceIds: readonly string[];
 }) {
   const [messages, setMessages] = useState<readonly ChatMessage[]>(initialMessages);
   const [chatId, setChatId] = useState(initialChatId);
@@ -64,6 +66,7 @@ export function ChatPanel({
     range: TextRange;
   } | null>(null);
 
+  const selection = useSourceSelection();
   const abortRef = useRef<AbortController | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
 
@@ -99,6 +102,10 @@ export function ChatPanel({
       const controller = new AbortController();
       abortRef.current = controller;
 
+      // Erst beim Absenden ausgewertet, nicht als Abhängigkeit: sonst würde
+      // jede Änderung an der Auswahl diese Funktion neu erzeugen.
+      const sourceIds = selection.selectedIds(readySourceIds);
+
       try {
         const response = await fetch('/api/chat', {
           method: 'POST',
@@ -107,9 +114,7 @@ export function ChatPanel({
             notebookId,
             ...(chatId ? { chatId } : {}),
             question,
-            ...(selectedSourceIds && selectedSourceIds.length > 0
-              ? { sourceIds: selectedSourceIds }
-              : {}),
+            ...(sourceIds ? { sourceIds } : {}),
           }),
           signal: controller.signal,
         });
@@ -187,7 +192,7 @@ export function ChatPanel({
         abortRef.current = null;
       }
     },
-    [notebookId, chatId, selectedSourceIds],
+    [notebookId, chatId, selection, readySourceIds],
   );
 
   const submit = () => {
@@ -307,8 +312,9 @@ export function ChatPanel({
             </div>
           </form>
           <p className="text-muted-foreground mt-2 text-center text-xs">
-            Antworten stützen sich nur auf die Quellen dieses Notizbuchs. Belege anklicken,
-            um die Stelle zu sehen.
+            {selection.excluded.size > 0
+              ? `${String(selection.excluded.size)} Quelle(n) abgewählt — Antworten stützen sich nur auf die übrigen.`
+              : 'Antworten stützen sich nur auf die Quellen dieses Notizbuchs. Belege anklicken, um die Stelle zu sehen.'}
           </p>
         </div>
       </div>

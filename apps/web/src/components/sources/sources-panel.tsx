@@ -5,6 +5,7 @@ import { FileText, Globe, RotateCcw, Trash2, Type } from 'lucide-react';
 import { useEffect, useRef, useState, useTransition } from 'react';
 
 import { deleteSource, retrySource } from '@/app/(app)/notebooks/[id]/sources/actions';
+import { useSourceSelection } from '@/components/notebooks/source-selection';
 import { AddSourceDialog } from '@/components/sources/add-source-dialog';
 import {
   StatusPill,
@@ -54,6 +55,7 @@ export function SourcesPanel({
   const [sources, setSources] = useState<readonly SourceRow[]>(initialSources);
   const [announcement, setAnnouncement] = useState('');
   const canEdit = hasAtLeastRole(role, 'editor');
+  const selection = useSourceSelection();
 
   /*
    * Der Server-Zustand gewinnt, wenn die Seite neu gerendert wird (etwa nach
@@ -136,6 +138,11 @@ export function SourcesPanel({
             <span className="text-muted-foreground font-normal">({sources.length})</span>
           )}
         </h2>
+        {selection.excluded.size > 0 && (
+          <Button variant="ghost" size="sm" onClick={selection.includeAll}>
+            Alle einbeziehen
+          </Button>
+        )}
       </div>
 
       {canEdit && <AddSourceDialog notebookId={notebookId} />}
@@ -189,6 +196,7 @@ function SourceCard({
   const [actionError, setActionError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [viewerOpen, setViewerOpen] = useState(false);
+  const selection = useSourceSelection();
   const Icon = KIND_ICON[source.kind] ?? FileText;
 
   const run = (work: () => Promise<{ error?: string }>) => {
@@ -204,10 +212,30 @@ function SourceCard({
       className={cn(
         'bg-surface rounded-lg border p-3 transition-colors',
         pending && 'opacity-60',
+        // Abgewählte Quellen bleiben sichtbar, treten aber zurück: der Nutzer
+        // soll sehen, dass sie da sind und gerade nicht mitzählen.
+        selection.excluded.has(source.id) && 'opacity-50',
       )}
     >
       <div className="flex items-start gap-2.5">
-        <Icon className="text-muted-foreground mt-0.5 size-4 shrink-0" aria-hidden />
+        {/*
+          Nur fertige Quellen lassen sich ab- und zuwählen. Eine Quelle, die
+          noch verarbeitet wird, hat keine Abschnitte — sie aus der Suche
+          auszuschliessen waere eine Auswahl ohne Wirkung.
+        */}
+        {source.status === 'ready' ? (
+          <input
+            type="checkbox"
+            checked={!selection.excluded.has(source.id)}
+            onChange={() => {
+              selection.toggle(source.id);
+            }}
+            className="accent-primary mt-0.5 size-4 shrink-0 cursor-pointer"
+            aria-label={`${source.title} im Chat berücksichtigen`}
+          />
+        ) : (
+          <Icon className="text-muted-foreground mt-0.5 size-4 shrink-0" aria-hidden />
+        )}
         <div className="min-w-0 flex-1">
           {/*
             Nur fertige Quellen sind anklickbar. Eine Schaltfläche, die

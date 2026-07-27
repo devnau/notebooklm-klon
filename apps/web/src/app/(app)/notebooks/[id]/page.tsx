@@ -5,6 +5,7 @@ import { notFound } from 'next/navigation';
 
 import { ChatPanel, type ChatMessage } from '@/components/chat/chat-panel';
 import { NotebookHeader } from '@/components/notebooks/notebook-header';
+import { SourceSelectionProvider } from '@/components/notebooks/source-selection';
 import { SourcesPanel, type SourceRow } from '@/components/sources/sources-panel';
 import { WorkspaceShell } from '@/components/layout/workspace-shell';
 import { createClient } from '@/lib/supabase/server';
@@ -93,30 +94,41 @@ export default async function NotebookPage({ params }: Params) {
     citations: (message.citations ?? []) as unknown as Citation[],
   }));
 
-  const readyCount = (sources ?? []).filter((source) => source.status === 'ready').length;
+  const readySourceIds = (sources ?? [])
+    .filter((source) => source.status === 'ready')
+    .map((source) => source.id);
 
   return (
     <>
       <NotebookHeader notebook={notebook} role={role} />
-      <WorkspaceShell
-        sources={
-          <SourcesPanel
-            notebookId={id}
-            role={role}
-            initialSources={(sources ?? []) as SourceRow[]}
-          />
-        }
-        chat={
-          <ChatPanel
-            notebookId={id}
-            initialMessages={messages}
-            initialChatId={chat?.id ?? null}
-            canAsk={hasAtLeastRole(role, 'editor')}
-            hasReadySources={readyCount > 0}
-          />
-        }
-        studio={<StudioPlaceholder />}
-      />
+      {/*
+        Der Provider umschliesst beide Spalten: die Quellenspalte setzt die
+        Auswahl, der Chat liest sie. Ein gemeinsamer Elternteil, durch den man
+        sie durchreichen könnte, existiert nicht — die Arbeitsfläche soll auf
+        dem Server gerendert bleiben.
+      */}
+      <SourceSelectionProvider>
+        <WorkspaceShell
+          sources={
+            <SourcesPanel
+              notebookId={id}
+              role={role}
+              initialSources={(sources ?? []) as SourceRow[]}
+            />
+          }
+          chat={
+            <ChatPanel
+              notebookId={id}
+              initialMessages={messages}
+              initialChatId={chat?.id ?? null}
+              canAsk={hasAtLeastRole(role, 'editor')}
+              hasReadySources={readySourceIds.length > 0}
+              readySourceIds={readySourceIds}
+            />
+          }
+          studio={<StudioPlaceholder />}
+        />
+      </SourceSelectionProvider>
     </>
   );
 }

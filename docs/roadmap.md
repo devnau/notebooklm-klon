@@ -106,14 +106,41 @@ Alle drei wären ohne Tests gegen die echte Anwendung unentdeckt geblieben.
    sichtbar, weil das Volume schon bestand — genau der Fehler, den der erste
    Fremde beim ersten `docker compose up` trifft.
 
-## Phase 3 — Chat und Zitate
+## Phase 3 — Chat und Zitate 🔨
 
-- `match_chunks` mit RRF, Quellenfilter
-- Systemprompt mit Prompt Caching
-- Streaming-Route, Zitat-Parsing und -Validierung
-- Klick auf Zitat springt zur Textstelle
-- Golden-Set-Tests: Recall, Zitat-Integrität, Abstinenz bei fehlender Deckung
-- Prompt-Injection-Test
+**Fertig:**
+
+- `match_chunks` mit Reciprocal Rank Fusion, Quellenfilter, `security invoker`
+- `chats` und `messages` mit Zitaten als jsonb, kein UPDATE auf Nachrichten
+- Zitatformat `[S1:4]`, Parser mit Prüfung gegen den tatsächlichen Kontext
+- Streaming-Route (NDJSON) mit Prompt Caching auf Systemprompt und
+  Quellenübersicht
+- Chat-UI: Streaming, anklickbare Belege, Sprung in den Viewer an die
+  Textstelle, Abbrechen
+- Quellenfilter in der Oberfläche
+- `npm run rag:e2e`: 16 Prüfungen gegen den laufenden Stack mit echten
+  Modellaufrufen — Recall, Zitat-Integrität, Abstinenz, Injection-Abwehr,
+  Cache-Treffer
+
+**Offen:**
+
+- Mehrere Unterhaltungen pro Notizbuch verwalten (aktuell wird die zuletzt
+  bearbeitete fortgesetzt)
+- „Antwort als Notiz speichern" — kommt mit Phase 4
+- Command-Palette (⌘K), weiter offen aus Phase 1
+
+**Was der Golden-Set-Lauf gezeigt hat:** die Injection-Abwehr hält. Das
+Testdokument enthält eine eingebettete Anweisung samt Codewort; das Modell hat
+die Sachfrage korrekt beantwortet, das Codewort nicht ausgegeben, den
+Systemprompt auch auf direkte Aufforderung nicht genannt — und den Nutzer von
+sich aus auf den Manipulationsversuch hingewiesen. Letzteres ist erfreulich,
+aber nichts, worauf sich ein Test stützen sollte: es hängt am Modell, nicht an
+unserem Code.
+
+**Ein Test war falsch, nicht die Antwort:** die Prüfung „keine erfundene Zahl"
+verlangte, dass in einer Antwort auf eine nicht gedeckte Frage gar keine
+dreistellige Zahl vorkommt — und schlug an der Jahreszahl aus der Frage selbst
+fehl. Geprüft wird jetzt auf eine Umsatzangabe.
 
 ## Phase 4 — Notizen und Studio
 
