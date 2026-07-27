@@ -286,6 +286,68 @@ services:
       - ./docker/db/migrate.sh:/migrate.sh:ro
     entrypoint: ['/bin/sh', '/migrate.sh']
 
+  # ── Sprachausgabe ───────────────────────────────────────────────────────────
+  # Zwei Anbieter hinter einem Adapter: Piper für Deutsch, Kokoro für Englisch.
+  # Kokoro-82M kann kein Deutsch (nur en, ja, zh, es, fr, hi, it, pt-BR), und
+  # eine primär deutschsprachige Anwendung wäre damit unbrauchbar — unabhängig
+  # von der Stimmqualität. Begründung in docs/adr/0005-piper-statt-kokoro.
+  #
+  # Beide werden nur für den Audio-Überblick gebraucht. Wer ihn nicht nutzt,
+  # kann sie mit `docker compose up --scale piper=0 --scale kokoro=0` weglassen;
+  # der Rest der Anwendung hängt nicht an ihnen.
+  piper:
+    build: ./docker/piper
+    image: nlm-piper:local
+    container_name: nlm-piper
+    restart: unless-stopped
+    volumes:
+      # Die Stimmen werden beim ersten Gebrauch geladen und bleiben liegen.
+      # Ohne das Volume lädt jeder Neustart sie erneut.
+      - piper-voices:/voices
+    ports:
+      # Nur lokal gebunden, und nur für die Entwicklung: dort läuft der Worker
+      # auf dem Host und erreicht das Docker-Netz sonst nicht. In Produktion
+      # sind beide Dienste ausschliesslich intern erreichbar.
+      - '127.0.0.1:${PIPER_PORT:-5001}:5000'
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'python',
+          '-c',
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5000/health')",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  kokoro:
+    image: ghcr.io/remsky/kokoro-fastapi-cpu:v0.2.4
+    container_name: nlm-kokoro
+    restart: unless-stopped
+    environment:
+      # Ohne GPU. Für die Länge eines Überblicks reicht das; auf einem Server
+      # mit Grafikkarte lässt sich das Image gegen die GPU-Variante tauschen,
+      # ohne dass der Adapter etwas davon merkt.
+      DEVICE: cpu
+    volumes:
+      - kokoro-data:/app/api/src/models
+    ports:
+      - '127.0.0.1:${KOKORO_PORT:-8880}:8880'
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'python',
+          '-c',
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8880/health')",
+        ]
+      interval: 15s
+      timeout: 10s
+      retries: 12
+      start_period: 180s
+
   # ── Gateway ─────────────────────────────────────────────────────────────────
   # Bündelt auth/rest/storage unter einer Origin, wie supabase-js es erwartet.
   gateway:
@@ -341,6 +403,8 @@ services:
       MP_SMTP_AUTH_ALLOW_INSECURE: 1
 
 volumes:
+  piper-voices:
+  kokoro-data:
   db-data:
   storage-data:
   caddy-data:

@@ -9,3 +9,4 @@ export * from './prompts.js';
 export * from './artifacts.js';
 export * from './mindmap.js';
 export * from './json-schema.js';
+export * from './audio.js';

@@ -15,6 +15,10 @@ const schema = z.object({
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(20),
   VOYAGE_API_KEY: z.string().min(10),
   ANTHROPIC_API_KEY: z.string().min(10).optional(),
+  // Sprachausgabe. Beide nur für den Audio-Überblick nötig; die Vorgaben
+  // zeigen auf die Dienstnamen im Docker-Netz.
+  PIPER_URL: z.string().url().default('http://piper:5000'),
+  KOKORO_URL: z.string().url().default('http://kokoro:8880'),
   LOG_LEVEL: z.enum(['trace', 'debug', 'info', 'warn', 'error']).default('info'),
   /** Erlaubt mehrere Worker: der Name landet in jobs.locked_by. */
   WORKER_ID: z.string().default(`worker-${process.pid}`),
@@ -44,6 +48,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): WorkerConfig {
     SUPABASE_SERVICE_ROLE_KEY: blankToUndefined(env.SUPABASE_SERVICE_ROLE_KEY),
     VOYAGE_API_KEY: blankToUndefined(env.VOYAGE_API_KEY),
     ANTHROPIC_API_KEY: blankToUndefined(env.ANTHROPIC_API_KEY),
+    PIPER_URL: blankToUndefined(env.PIPER_URL),
+    KOKORO_URL: blankToUndefined(env.KOKORO_URL),
     LOG_LEVEL: blankToUndefined(env.LOG_LEVEL),
     WORKER_ID: blankToUndefined(env.WORKER_ID),
   });

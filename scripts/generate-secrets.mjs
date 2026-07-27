@@ -96,6 +96,15 @@ MAILPIT_UI_PORT=8025
 REALTIME_ENC_KEY=${realtimeEncKey}
 REALTIME_SECRET_KEY_BASE=${realtimeSecretKeyBase}
 
+# ── Sprachausgabe ────────────────────────────────────────────────────────────
+# Adressen aus Sicht des Workers. Läuft er wie in der Entwicklung auf dem Host,
+# zeigen sie auf die lokal gebundenen Ports; im Container sind es die
+# Dienstnamen (http://piper:5000, http://kokoro:8880).
+PIPER_PORT=5001
+KOKORO_PORT=8880
+PIPER_URL=http://localhost:5001
+KOKORO_URL=http://localhost:8880
+
 # ── Verhalten ────────────────────────────────────────────────────────────────
 DISABLE_SIGNUP=false
 MAILER_AUTOCONFIRM=true
