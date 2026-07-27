@@ -49,6 +49,15 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
+
+      # Die Tests zum Zusammenschnitt laufen gegen echtes ffmpeg, nicht gegen
+      # eine Attrappe: was dort schiefgeht, geht in der Filtersyntax schief,
+      # und ein Mock würde genau das durchwinken. Übersprungen werden sie
+      # bewusst nicht — stillschweigend ausgelassene Tests sind schlimmer als
+      # keine, weil sie grün aussehen.
+      - name: ffmpeg installieren
+        run: sudo apt-get update && sudo apt-get install --no-install-recommends -y ffmpeg
+
       - run: npm ci
       - run: npm test
 

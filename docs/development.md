@@ -70,6 +70,21 @@ typgeprüft werden — und ESLints `projectService` findet nur Dateien, die in e
 
 `npm run typecheck` deckt deshalb alle drei Projekte ab.
 
+## Voraussetzungen
+
+Neben Node und Docker: **ffmpeg** (mit `ffprobe`). Der Worker setzt damit den
+Audio-Überblick zusammen, und die zugehörigen Tests laufen gegen das echte
+Programm statt gegen eine Attrappe.
+
+```bash
+brew install ffmpeg        # macOS
+sudo apt install ffmpeg    # Debian, Ubuntu
+```
+
+Fehlt es, schlagen die Tests in `apps/worker/tests/audio-mix.test.ts` mit
+`spawn ffmpeg ENOENT` fehl. Das ist gewollt: sie zu überspringen würde einen
+grünen Lauf vortäuschen, obwohl der Audio-Weg ungeprüft bleibt.
+
 ## Migrationen schreiben
 
 1. Neue Datei in `supabase/migrations/` mit der nächsten Nummer:
