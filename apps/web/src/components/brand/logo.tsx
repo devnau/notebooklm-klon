@@ -3,12 +3,18 @@ import Link from 'next/link';
 import { cn } from '@/lib/utils';
 
 /**
- * Wortmarke als Inline-SVG. Platzhalter, bis brand/logo-wordmark.svg vorliegt
- * (Prompt 1 in assets/PROMPTS.md) — gleiche Maße, damit der Austausch später
- * kein Layout verschiebt.
+ * Die Bildmarke als Inline-SVG.
  *
- * Das Zeichen greift die Idee der App auf: zwei versetzte Flächen, verbunden
- * durch eine Linie, die auf einen Punkt zeigt — eine Aussage und ihre Quelle.
+ * Nachgezeichnet nach der gelieferten Vorlage (`assets/quellen/icon-hell.png`),
+ * nicht eingebettet: als SVG bleibt sie bei jeder Grösse scharf, erbt die
+ * Themenfarbe über `currentColor` und kostet keinen zusätzlichen Request. Ein
+ * Rasterbild im Kopfbereich müsste in mehreren Auflösungen vorliegen und
+ * bräuchte für den dunklen Modus eine zweite Datei.
+ *
+ * Die Geometrie ist die Aussage der Anwendung: zwei versetzte Flächen — die
+ * Antwort und ihre Quelle — als eine gemeinsame Kontur, und darin eine Linie,
+ * die von einem Punkt zurück in die zweite Fläche führt. Der Punkt ist das
+ * Zitat.
  */
 export function LogoMark({
   className,
@@ -27,29 +33,21 @@ export function LogoMark({
       viewBox="0 0 32 32"
       className={cn('size-8', className)}
       fill="none"
+      stroke="currentColor"
+      strokeWidth="2.2"
+      strokeLinejoin="round"
+      strokeLinecap="round"
       {...(label ? { role: 'img', 'aria-label': label } : { 'aria-hidden': true })}
     >
-      <rect
-        x="3"
-        y="4"
-        width="15"
-        height="19"
-        rx="2.5"
-        stroke="currentColor"
-        strokeWidth="2"
-      />
-      <rect
-        x="14"
-        y="9"
-        width="15"
-        height="19"
-        rx="2.5"
-        className="fill-background"
-        stroke="currentColor"
-        strokeWidth="2"
-      />
-      <path d="M18.5 18.5h6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-      <circle cx="18.5" cy="18.5" r="1.75" fill="currentColor" />
+      {/*
+        Eine einzige Kontur um beide Flächen statt zweier Rechtecke: so gibt es
+        keine Linie mitten durch die Form, und die Marke bleibt bei 16 Pixel
+        noch als Silhouette lesbar.
+      */}
+      <path d="M5 6h14v5h8v15H13v-5H5z" />
+      {/* Vom Zitatpunkt zurück in die zweite Fläche. */}
+      <path d="M13.5 16H19v10" />
+      <circle cx="12" cy="16" r="2.1" fill="currentColor" stroke="none" />
     </svg>
   );
 }

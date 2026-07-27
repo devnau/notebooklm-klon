@@ -22,18 +22,24 @@ export default function AuthLayout({ children }: { readonly children: ReactNode 
         aria-hidden
       >
         {/*
-          Dezentes Linienmuster als Platzhalter, bis backgrounds/auth.png
-          vorliegt (Prompt 4 in assets/PROMPTS.md). Gleiche Bildwirkung, damit
-          der Austausch später kein Layout verschiebt.
+          Als <picture> statt über next/image: das Bild füllt eine dekorative
+          Fläche, deren Grösse vom Layout kommt und nicht von der Bildgrösse.
+          next/image bringt hier nur Zusatzarbeit — es gibt nichts zu
+          skalieren, was nicht schon der Browser besser macht, und die beiden
+          Formate liegen fertig vor.
+
+          Im dunklen Modus wird das Bild abgeblendet: die Vorlage ist auf
+          Papierweiss gezeichnet und leuchtete sonst als heller Block neben
+          einem dunklen Formular.
         */}
-        <div
-          className="absolute inset-0 opacity-[0.07]"
-          style={{
-            backgroundImage:
-              'radial-gradient(circle at 1px 1px, currentColor 1px, transparent 0)',
-            backgroundSize: '32px 32px',
-          }}
-        />
+        <picture>
+          <source srcSet="/backgrounds/auth.avif" type="image/avif" />
+          <img
+            src="/backgrounds/auth.webp"
+            alt=""
+            className="absolute inset-0 size-full object-cover dark:opacity-15 dark:invert"
+          />
+        </picture>
         <div className="relative flex h-full flex-col justify-end p-16">
           <blockquote className="max-w-md">
             <p className="font-serif text-2xl leading-snug text-balance">

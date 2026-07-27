@@ -52,6 +52,78 @@ Diese Absätze **jedem** Prompt voranstellen:
 
 ---
 
+## Stand
+
+Vorlagen liegen unter `assets/quellen/`, die ausgelieferten Ableitungen erzeugt
+`node scripts/process-assets.mjs`. Die Vorlagen bleiben im Repo: kommt eine neue
+Fassung, wird sie ersetzt und das Skript erneut ausgeführt.
+
+| Asset                          | Vorlage                               | Stand                             |
+| ------------------------------ | ------------------------------------- | --------------------------------- |
+| Wortmarke                      | `quellen/wortmarke-hell.png`          | ✅ übernommen                     |
+| Bildmarke                      | `quellen/icon-hell.png`               | ✅ als SVG nachgezeichnet         |
+| App-Icon                       | `quellen/icon-app.png`                | ✅ Favicon, Apple-Touch, Maskable |
+| Auth-Hintergrund               | `quellen/auth-hintergrund.png`        | ✅ eingebaut                      |
+| Leerer Zustand „kein Notebook" | `quellen/empty-notebooks-entwurf.png` | ⚠️ nachzuliefern                  |
+
+### Wortmarke: als Rasterbild, nicht im Kopfbereich
+
+Die Vorlage hat einen papierweissen Hintergrund statt Transparenz. Den
+herauszurechnen wäre bei der leichten Textur ein Ratespiel mit ausgefransten
+Kanten — sie bleibt deshalb wie geliefert und wird dort verwendet, wo ohnehin
+eine helle Fläche darunterliegt: Social-Vorschau, README, E-Mail.
+
+Im Kopfbereich steht stattdessen ein **Inline-SVG**, nachgezeichnet nach der
+gelieferten Bildmarke (`components/brand/logo.tsx`). Gründe: es bleibt bei jeder
+Grösse scharf, erbt über `currentColor` die Themenfarbe — der dunkle Modus
+braucht damit keine zweite Datei — und kostet keinen zusätzlichen Request. Ein
+Rasterbild müsste in mehreren Auflösungen vorliegen.
+
+### Nachzuliefern
+
+**Leerer Zustand „kein Notebook".** Die gelieferte Fassung weicht in drei
+Punkten vom Briefing ab, jeder einzelne macht sie an dieser Stelle unbrauchbar:
+
+- **Grauer Vollflächenhintergrund** statt Transparenz. Die Illustration steht
+  auf papierweissem Grund; so erschiene sie als grauer Kasten mitten auf der
+  Seite.
+- **Leuchteffekt** um die Karten. Die Stil-Präambel schliesst Glasmorphismus,
+  Schlagschatten und Neon ausdrücklich aus, und der Effekt passt nicht zu den
+  flachen Konturen der übrigen Assets.
+- **Cyan statt Petrol.** Die Karte leuchtet in einem kühlen Blau; die Palette
+  verlangt `#0F6E7A`.
+
+Der Prompt unten ist gegenüber dem ursprünglichen an genau diesen Punkten
+geschärft. Bis die neue Fassung da ist, bleibt der Platzhalter stehen — es
+blockiert nichts.
+
+**Geschärfter Prompt** (Stil-Präambel wie immer voranstellen):
+
+> Illustration für den Zustand „noch kein Notebook angelegt", 800 × 600.
+>
+> **Der Hintergrund ist vollständig transparent.** Keine Hintergrundfläche,
+> keine Grundfarbe, kein Verlauf hinter den Formen — das Bild wird auf
+> papierweissem Grund eingesetzt und muss dort nahtlos wirken.
+>
+> Zeige drei bis vier leere Rechtecke mit abgerundeten Ecken, leicht versetzt
+> übereinander wie Karten in einer Ablage, in Schrägansicht von vorn. Sie sind
+> **nur konturiert, nicht gefüllt**, mit gleichmässiger Linienstärke von etwa
+> 2 Pixel. Keine Textlinien darin — sie sind bewusst leer.
+>
+> Das vorderste Rechteck ist in Petrol `#0F6E7A` konturiert, die dahinter
+> liegenden in warmem Grau mit abnehmender Deckkraft. Links unten deutet eine
+> einzelne feine Linie eine Ablagefläche an.
+>
+> **Ausdrücklich nicht:** kein Leuchten, kein Schein, kein Glow um die Formen,
+> keine Schlagschatten, keine gefüllten Flächen, kein Cyan oder Himmelblau,
+> keine transparenten Glasflächen. Die Formen sind flache Linienzeichnungen wie
+> ein technisches Diagramm, nicht wie ein Bildschirm.
+>
+> Die Komposition ist ruhig und einladend: ein aufgeräumter Schreibtisch vor dem
+> Anfang, nicht ein verlassener. Reichlich Freiraum.
+
+---
+
 ## Phase 1
 
 ### 1. Wortmarke und Icon
