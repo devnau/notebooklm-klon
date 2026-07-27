@@ -4,27 +4,47 @@ Ein selbst gehosteter NotebookLM-Klon: eigene Quellen hochladen und mit belegten
 Antworten durcharbeiten. Jede Aussage im Chat führt per Klick zur Textstelle, aus
 der sie stammt.
 
-Der Unterschied zu einem allgemeinen Chatbot ist das **Grounding**: das Modell
+Der Unterschied zu einem allgemeinen Chatbot ist das **Grounding**: Das Modell
 antwortet ausschließlich aus den hochgeladenen Quellen und markiert jede
-Sachaussage mit einem Zitat. Deckt das Material eine Frage nicht ab, sagt es das
+Sachaussage mit einem Zitat. Deckt das Material eine Frage nicht ab, sagt es das,
 statt zu raten.
 
-> **Status:** einsatzfähig für den Eigenbetrieb. Was fehlt und was
-> zurückgestellt ist, steht in [docs/roadmap.md](docs/roadmap.md) — vor allem:
-> **Teilen ist noch nicht gebaut.** Das Rollenmodell existiert vollständig, es
-> gibt nur keinen Weg, jemanden einzuladen; jedes Notizbuch hat genau ein
-> Mitglied.
+> **Status:** einsatzfähig für den Eigenbetrieb. Quellenimport, belegter Chat,
+> Notizen, Studio-Artefakte und Audio-Überblicke funktionieren. Teilen und
+> Zusammenarbeit sind architektonisch vorbereitet, aber noch nicht über die
+> Oberfläche verfügbar. Der aktuelle Stand und offene Punkte stehen in
+> [docs/roadmap.md](docs/roadmap.md).
+
+## Projektziel
+
+Ziel ist nicht, jede Funktion von NotebookLM nachzubauen. Der Schwerpunkt liegt
+auf einem belastbaren Kern: Quellen sicher importieren, Antworten ausschließlich
+aus diesen Quellen erzeugen und jede Aussage nachvollziehbar belegen.
+
+## Schnell ansehen
+
+Der wichtigste Ablauf für eine Demo:
+
+1. Notebook anlegen
+2. PDF, DOCX, URL oder Text als Quelle hinzufügen
+3. Eine Frage zu den Quellen stellen
+4. Über ein Zitat direkt zur belegenden Textstelle springen
+5. Aus denselben Quellen ein Studio-Artefakt oder einen Audio-Überblick erzeugen
+
+Eine gehostete Demo ist bewusst nicht Teil des Repositories, da dafür externe
+Modell-APIs und ein eigener Server benötigt werden. Der lokale Schnellstart unten
+setzt die vollständige Anwendung reproduzierbar auf.
 
 ## Funktionen
 
-| Bereich     | Was es tut                                                                                                                          |
-| ----------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| **Quellen** | PDF, DOCX, Markdown, Textdateien, URLs und eingefügter Text. Werden extrahiert, strukturbewusst zerlegt und als Vektoren indexiert. |
-| **Chat**    | Hybride Suche (Vektor + Volltext) über die Quellen, Antwort im Streaming, jede Aussage mit klickbarem Zitat.                        |
-| **Notizen** | Eigene Notizen und gespeicherte Antworten, Markdown.                                                                                |
-| **Studio**  | Generierte Artefakte: Zusammenfassung, Lernleitfaden, FAQ, Zeitleiste, Briefing, Mindmap.                                           |
-| **Audio**   | Zweistimmiger Dialog über die Quellen als MP3, lokal per TTS erzeugt.                                                               |
-| **Teilen**  | Notebooks mit Rollen (Owner, Editor, Viewer) und Links mit Ablaufdatum.                                                             |
+| Bereich | Status | Was es tut |
+| --- | --- | --- |
+| **Quellen** | ✅ verfügbar | PDF, DOCX, Markdown, Textdateien, URLs und eingefügter Text. Inhalte werden extrahiert, strukturbewusst zerlegt und als Vektoren indexiert. |
+| **Chat** | ✅ verfügbar | Hybride Suche aus Vektor- und Volltexttreffern, Streaming-Antworten und klickbare Zitate für belegte Aussagen. |
+| **Notizen** | ✅ verfügbar | Eigene Markdown-Notizen und gespeicherte Antworten einschließlich ihrer Belege. |
+| **Studio** | ✅ verfügbar | Zusammenfassung, Lernleitfaden, FAQ, Zeitleiste, Briefing und Mindmap aus den ausgewählten Quellen. |
+| **Audio** | ✅ verfügbar | Zweistimmiger Dialog über die Quellen als MP3, lokal per TTS erzeugt. |
+| **Zusammenarbeit** | 🚧 vorbereitet | Rollenmodell für Owner, Editor und Viewer ist vorhanden. Einladungen und Freigabelinks fehlen noch. |
 
 ## Technik
 
@@ -38,7 +58,7 @@ Wie die Teile zusammenspielen: [docs/architecture.md](docs/architecture.md).
 
 ## Schnellstart
 
-Voraussetzungen: Docker und Node.js 22 oder neuer.
+Voraussetzungen: Docker und Node.js 24.
 
 ```bash
 git clone https://github.com/devnau/notebooklm-klon.git
@@ -58,7 +78,7 @@ Die App läuft auf <http://localhost:3000>, das API-Gateway auf
 <http://localhost:8000>, abgefangene E-Mails (Magic Links) liegen in Mailpit auf
 <http://localhost:8025>.
 
-Ob der Stack wirklich funktioniert — nicht nur „läuft" — prüft:
+Ob der Stack wirklich funktioniert — nicht nur „läuft“ — prüft:
 
 ```bash
 node scripts/smoke-test.mjs
@@ -77,19 +97,31 @@ npm run format       # Prettier
 Details, Konventionen und wie man eine Migration schreibt:
 [docs/development.md](docs/development.md).
 
+## Qualitätssicherung
+
+Die CI prüft jeden Pull Request und Änderungen auf `main` mit:
+
+- Linting, Formatierung und TypeScript
+- Unit- und Integrationstests
+- frischem Produktionsbuild
+- RLS- und Datenbanktests gegen einen echten Stack
+- Playwright-End-to-End-Tests
+- Secret-Scan über die vollständige Git-Historie
+- Audit der npm-Abhängigkeiten
+
 ## Dokumentation
 
-| Datei                                        | Inhalt                                           |
-| -------------------------------------------- | ------------------------------------------------ |
+| Datei | Inhalt |
+| --- | --- |
 | [docs/architecture.md](docs/architecture.md) | Komponenten, Datenflüsse, warum es so gebaut ist |
-| [docs/data-model.md](docs/data-model.md)     | Tabellen, Beziehungen, RLS-Regeln                |
-| [docs/security.md](docs/security.md)         | Bedrohungsmodell, Berechtigungsmatrix, Secrets   |
-| [docs/development.md](docs/development.md)   | Lokales Setup, Tests, Migrationen, Konventionen  |
-| [docs/rag.md](docs/rag.md)                   | Chunking, Hybrid-Suche, Zitate, Prompt-Aufbau    |
-| [docs/deployment.md](docs/deployment.md)     | Server aufsetzen, Abnahmeliste, Aktualisieren    |
-| [docs/operations.md](docs/operations.md)     | Runbooks: Sichern, Wiederherstellen, Störungen   |
-| [docs/adr/](docs/adr/)                       | Architekturentscheidungen samt Begründung        |
-| [assets/PROMPTS.md](assets/PROMPTS.md)       | Bild-Prompts für alle Grafiken                   |
+| [docs/data-model.md](docs/data-model.md) | Tabellen, Beziehungen, RLS-Regeln |
+| [docs/security.md](docs/security.md) | Bedrohungsmodell, Berechtigungsmatrix, Secrets |
+| [docs/development.md](docs/development.md) | Lokales Setup, Tests, Migrationen, Konventionen |
+| [docs/rag.md](docs/rag.md) | Chunking, Hybrid-Suche, Zitate, Prompt-Aufbau |
+| [docs/deployment.md](docs/deployment.md) | Server aufsetzen, Abnahmeliste, Aktualisieren |
+| [docs/operations.md](docs/operations.md) | Runbooks: Sichern, Wiederherstellen, Störungen |
+| [docs/adr/](docs/adr/) | Architekturentscheidungen samt Begründung |
+| [assets/PROMPTS.md](assets/PROMPTS.md) | Bild-Prompts für alle Grafiken |
 
 ## Sicherheit
 
