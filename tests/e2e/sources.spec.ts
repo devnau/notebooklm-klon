@@ -54,6 +54,67 @@ test.describe('Quellen', () => {
     await expect(panel.getByText(/In der Warteschlange|Wird gelesen/)).toBeVisible();
   });
 
+  test('eine Datei wird hochgeladen und erscheint als Quelle', async ({ page }) => {
+    /*
+     * Der Weg, der bisher in keinem Test steckte — und genau der, der im ersten
+     * lokalen Betrieb fehlschlug.
+     *
+     * Er ist der einzige, der **direkt vom Browser** in den Storage-Bucket geht,
+     * nicht über eine Server Action. Damit ist er auch der einzige, der CORS
+     * unterliegt: in der Entwicklung läuft die Anwendung auf Port 3000 und das
+     * Gateway auf 8000, in Produktion liegen beide auf derselben Origin. Ein
+     * fehlender `Access-Control-Allow-Origin` fällt deshalb nur lokal auf, und
+     * nur bei einem echten Datei-Upload.
+     *
+     * Die Prüfungen mit eingefügtem Text und mit einer Adresse laufen über
+     * Server Actions und hätten das nie gezeigt.
+     *
+     * Geprüft wird bis „liegt in der Warteschlange" — weiter zu kommen bräuchte
+     * einen laufenden Worker und einen Voyage-Schlüssel.
+     */
+    await register(page, uniqueUser());
+    await createNotebook(page, 'Upload-Notebook');
+
+    const panel = sourcesPanel(page);
+    await panel.getByRole('button', { name: 'Quelle hinzufügen' }).click();
+
+    // Der Reiter „Datei" ist voreingestellt; das Eingabefeld ist visuell
+    // versteckt und über seine Beschriftung erreichbar.
+    await page
+      .getByLabel('Dateien auswählen')
+      .setInputFiles('tests/fixtures/zwei-seiten.pdf');
+
+    await expect(panel.getByTitle('zwei-seiten.pdf')).toBeVisible({ timeout: 25_000 });
+    await expect(panel.getByText(/In der Warteschlange|Wird gelesen/)).toBeVisible();
+  });
+
+  test('eine Datei mit falschem Inhalt wird vor dem Upload abgelehnt', async ({ page }) => {
+    /*
+     * Die Prüfung im Browser ist keine Sicherheitsmaßnahme — verbindlich prüft
+     * der Worker an den Bytes im Bucket. Sie erspart dem Nutzer aber, 40 MB
+     * hochzuladen, bevor er erfährt, dass die Datei nicht taugt. Dass sie
+     * überhaupt greift, sollte geprüft sein.
+     */
+    await register(page, uniqueUser());
+    await createNotebook(page, 'Ablehnung-Notebook');
+
+    const panel = sourcesPanel(page);
+    await panel.getByRole('button', { name: 'Quelle hinzufügen' }).click();
+
+    // Ein SVG, umbenannt zu .pdf: der Inhalt passt nicht zur Endung, und SVG
+    // ist als Nutzerinhalt ohnehin ausgeschlossen (XSS-Vektor).
+    await page.getByLabel('Dateien auswählen').setInputFiles({
+      name: 'getarnt.pdf',
+      mimeType: 'application/pdf',
+      buffer: Buffer.from(
+        '<svg xmlns="http://www.w3.org/2000/svg"><script>1</script></svg>',
+      ),
+    });
+
+    await expect(page.getByText(/Fehlgeschlagen/)).toBeVisible({ timeout: 15_000 });
+    await expect(panel.getByTitle('getarnt.pdf')).toBeHidden();
+  });
+
   test('eine Adresse im lokalen Netz wird abgelehnt', async ({ page }) => {
     await register(page, uniqueUser());
     await createNotebook(page, 'SSRF-Notebook');

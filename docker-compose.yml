@@ -368,6 +368,12 @@ services:
       # Anwendung aus statt nach einem noch nicht fertigen Stack.
       storage-init:
         condition: service_completed_successfully
+    environment:
+      # Nur für die CORS-Freigabe in der Entwicklung: die Anwendung läuft auf
+      # einem anderen Port als das Gateway, und der Datei-Upload geht direkt
+      # vom Browser in den Storage-Bucket. In Produktion liegen beide auf
+      # derselben Origin und es gibt nichts freizugeben.
+      PUBLIC_APP_URL: ${PUBLIC_APP_URL:-http://localhost:3000}
     volumes:
       - ./docker/caddy/Caddyfile.dev:/etc/caddy/Caddyfile:ro
       - caddy-data:/data

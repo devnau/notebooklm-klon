@@ -1,12 +1,57 @@
 # Gateway für die Entwicklung: bündelt Auth, REST und Storage unter einer
 # Origin, damit @supabase/supabase-js mit einer einzigen URL arbeiten kann.
 # TLS und Security-Header kommen in docker/caddy/Caddyfile.prod dazu.
+#
+# **CORS gibt es nur hier, nicht in Produktion.** Dort liegen Anwendung und
+# Supabase auf derselben Origin (`https://notizbuch.example.de`), und es gibt
+# nichts freizugeben. In der Entwicklung läuft die Anwendung auf Port 3000 und
+# das Gateway auf 8000 — für den Browser sind das zwei Herkünfte.
+#
+# Betroffen ist genau ein Weg, und er fiel deshalb lange nicht auf: der
+# **Datei-Upload**. Er geht absichtlich direkt vom Browser in den Storage-Bucket,
+# nicht über den Anwendungsserver. Alles andere läuft über Server Actions, und
+# die kennen keine CORS-Regeln.
 
 {
 	admin off
 	auto_https off
 	log {
 		level ERROR
+	}
+}
+
+# Nur diese Herkunft wird freigegeben, nicht `*` und nicht der eingehende
+# Origin-Header. Das Gateway hört ohnehin nur auf 127.0.0.1, aber ein Snippet,
+# das jede Herkunft durchlässt, wandert erfahrungsgemäss irgendwann in eine
+# Produktionskonfiguration.
+(cors) {
+	@erlaubt header Origin {$PUBLIC_APP_URL:http://localhost:3000}
+
+	# Preflight beantwortet das Gateway selbst. Weiterzuleiten hilft nicht:
+	# GoTrue, PostgREST und Storage antworten auf OPTIONS uneinheitlich, und
+	# einer davon würde immer fehlen.
+	@preflight {
+		method OPTIONS
+		header Origin {$PUBLIC_APP_URL:http://localhost:3000}
+	}
+	handle @preflight {
+		header {
+			Access-Control-Allow-Origin "{$PUBLIC_APP_URL:http://localhost:3000}"
+			Access-Control-Allow-Methods "GET, POST, PUT, PATCH, DELETE, OPTIONS"
+			# Die Liste ist nicht geraten: supabase-js schickt apikey,
+			# authorization und x-client-info bei jeder Anfrage, x-upsert beim
+			# Upload und range beim Teilabruf von Audiodateien.
+			Access-Control-Allow-Headers "authorization, apikey, content-type, x-client-info, x-upsert, cache-control, range, prefer"
+			Access-Control-Max-Age "86400"
+		}
+		respond 204
+	}
+
+	header @erlaubt {
+		Access-Control-Allow-Origin "{$PUBLIC_APP_URL:http://localhost:3000}"
+		# Ohne diese Freigabe kann JavaScript die Kopfzeilen nicht lesen —
+		# content-range braucht der Audio-Player beim Spulen.
+		Access-Control-Expose-Headers "content-range, content-length, etag"
 	}
 }
 
@@ -18,16 +63,19 @@
 
 	# GoTrue erwartet die Pfade ohne /auth/v1-Prefix.
 	handle_path /auth/v1/* {
+		import cors
 		reverse_proxy auth:9999
 	}
 
 	# PostgREST: /rest/v1/notebooks -> /notebooks
 	handle_path /rest/v1/* {
+		import cors
 		reverse_proxy rest:3000
 	}
 
 	# Storage-API: /storage/v1/object/... -> /object/...
 	handle_path /storage/v1/* {
+		import cors
 		reverse_proxy storage:5000
 	}
 
@@ -35,7 +83,7 @@
 	# /realtime/v1/websocket, der Dienst lauscht auf /socket/websocket.
 	# handle_path entfernt das Präfix, rewrite setzt /socket davor.
 	# Caddy erkennt den Upgrade-Header selbst — für WebSockets ist nichts
-	# Zusätzliches nötig.
+	# Zusätzliches nötig, und CORS gilt für sie nicht.
 	handle_path /realtime/v1/* {
 		rewrite * /socket{uri}
 		reverse_proxy realtime:4000 {
