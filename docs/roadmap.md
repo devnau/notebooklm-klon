@@ -142,12 +142,42 @@ verlangte, dass in einer Antwort auf eine nicht gedeckte Frage gar keine
 dreistellige Zahl vorkommt — und schlug an der Jahreszahl aus der Frage selbst
 fehl. Geprüft wird jetzt auf eine Umsatzangabe.
 
-## Phase 4 — Notizen und Studio
+## Phase 4 — Notizen und Studio 🔨
 
-- Notizen mit sanitisiertem Markdown-Editor
-- Artefakte: Zusammenfassung, Lernleitfaden, FAQ, Zeitleiste, Briefing, Mindmap
-- Structured Outputs je Typ, Mermaid für die Mindmap
-- Antwort oder Artefakt als Notiz speichern
+**Fertig:**
+
+- Notizen: anlegen, bearbeiten, löschen; Markdown wird beim Anzeigen sanitisiert
+- „Antwort als Notiz speichern" — die Belege wandern mit
+- Sechs Artefaktarten über Structured Outputs, je eigenes Zod-Schema
+- Mermaid für die Mindmap, nachgeladen statt mitgebündelt
+- Ein Artefakt je Art und Notizbuch; „veraltet"-Hinweis, sobald eine Quelle
+  dazugekommen ist
+- 14 Tests gegen die Sanitisierung, 12 gegen die Kontext-Abtastung,
+  10 gegen den Mermaid-Erzeuger
+- `npm run rag:e2e` prüft zusätzlich drei Artefaktarten Ende zu Ende: Struktur
+  vorhanden, Belege zeigen auf echte Abschnitte
+
+**Offen:**
+
+- „Artefakt als Notiz speichern" (Antwort geht schon)
+- Playwright-Abdeckung für Notizen und Artefakte — beides braucht eine fertig
+  verarbeitete Quelle und damit einen laufenden Worker
+
+**Drei Fehler, die diese Phase aufgedeckt hat**
+
+1. **Structured Outputs nehmen nicht jedes JSON-Schema.** Bei Arrays ist
+   `maxItems` gar nicht erlaubt und `minItems` nur mit 0 oder 1. Alle
+   Unit-Tests waren grün, und dann lehnte die API jedes einzelne
+   Artefaktschema mit HTTP 400 ab. `toStructuredOutputSchema()` dreht die
+   Schemas für den Versand; die Anzahlen bleiben in Zod und werden nach der
+   Antwort geprüft.
+2. **Ein Test war grün, ohne etwas zu prüfen.** Die Sanitizer-Tests
+   verwendeten `.process()` ohne `await`; `String(promise)` ergibt
+   `'[object Promise]'`, und jede Negativprüfung ging damit durch. Aufgefallen
+   ist es nur, weil daneben Positivprüfungen standen.
+3. **Fünf Datenbankabfragen nacheinander.** Mit Artefakten und Notizen wurde
+   der Seitenaufbau so träge, dass der Playwright-Lauf in der CI scheiterte.
+   Jetzt laufen sie nebenläufig — derselbe Gewinn für jeden echten Aufruf.
 
 ## Phase 5 — Audio-Überblick
 
@@ -166,6 +196,13 @@ fehl. Geprüft wird jetzt auf eine Umsatzangabe.
 
 ## Phase 7 — Härtung und Betrieb
 
+- **Standalone-Server statt `next start`.** Die Anwendung baut mit
+  `output: standalone`; `next start` warnt dabei ausdrücklich, dass das nicht
+  vorgesehen ist, und liefert trotzdem aus. Für das Produktionsimage ist
+  `node .next/standalone/server.js` der richtige Weg — mit den Kopierschritten
+  für `.next/static` und `public`. Sobald das steht, sollte auch der
+  Playwright-Lauf in der CI darauf umgestellt werden, damit dort genau das
+  läuft, was ausgeliefert wird.
 - i18n (de, en), Rate-Limits, Kostenerfassung in `llm_usage`
 - `pino`-Logging, `/api/health` mit DB-, Storage- und Worker-Prüfung
 - `docker-compose.prod.yml` mit Caddy, TLS, CSP und HSTS

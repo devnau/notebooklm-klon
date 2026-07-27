@@ -59,15 +59,31 @@ export default defineConfig({
 
   webServer: {
     /*
+     * In der CI gegen den Produktionsbuild, lokal gegen den Dev-Server.
+     *
+     * Der Grund ist nicht Geschwindigkeit um ihrer selbst willen: der
+     * Dev-Server kompiliert jede Route beim ersten Aufruf, und mit dem
+     * Studio-Panel aus Phase 4 — Markdown-Renderer, Mermaid im Modulgraphen —
+     * dauerte das auf einem ausgelasteten Läufer länger als jede vertretbare
+     * Wartezeit. Die Tests scheiterten damit an der Übersetzung, nicht an der
+     * Anwendung.
+     *
+     * Nebenbei prüft die CI so das, was tatsächlich ausgeliefert wird. Lokal
+     * bleibt der Dev-Server, weil ein Build vor jedem Testlauf die
+     * Rückkopplung zerstören würde.
+     *
      * @nlm/shared wird über das exports-Feld aus dist/ geladen. In einem
-     * frischen Checkout existiert dist/ nicht, und der Dev-Server bricht beim
+     * frischen Checkout existiert dist/ nicht, und der Server bricht beim
      * ersten Import ab — lokal fällt das nicht auf, weil dist/ dort meist schon
-     * liegt. Genau daran ist der E2E-Job in der CI gescheitert.
+     * liegt. Genau daran ist der E2E-Job in der CI schon einmal gescheitert.
      */
-    command: 'npm run build --workspace=@nlm/shared && npm run dev --workspace=@nlm/web',
+    command: process.env.CI
+      ? 'npm run build --workspace=@nlm/shared && npm run build --workspace=@nlm/web && npm run start --workspace=@nlm/web'
+      : 'npm run build --workspace=@nlm/shared && npm run dev --workspace=@nlm/web',
     url: 'http://localhost:3000/anmelden',
     reuseExistingServer: !process.env.CI,
-    timeout: 120_000,
+    // Der Produktionsbuild in der CI braucht mehr als zwei Minuten Anlauf.
+    timeout: process.env.CI ? 300_000 : 120_000,
     stdout: 'ignore',
     stderr: 'pipe',
   },
