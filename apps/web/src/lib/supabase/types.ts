@@ -7,6 +7,41 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      chats: {
+        Row: {
+          created_at: string;
+          created_by: string | null;
+          id: string;
+          notebook_id: string;
+          title: string;
+          updated_at: string;
+        };
+        Insert: {
+          created_at?: string;
+          created_by?: string | null;
+          id?: string;
+          notebook_id: string;
+          title?: string;
+          updated_at?: string;
+        };
+        Update: {
+          created_at?: string;
+          created_by?: string | null;
+          id?: string;
+          notebook_id?: string;
+          title?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'chats_notebook_id_fkey';
+            columns: ['notebook_id'];
+            isOneToOne: false;
+            referencedRelation: 'notebooks';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       chunks: {
         Row: {
           char_end: number | null;
@@ -119,6 +154,66 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: 'jobs_notebook_id_fkey';
+            columns: ['notebook_id'];
+            isOneToOne: false;
+            referencedRelation: 'notebooks';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      messages: {
+        Row: {
+          cache_read_tokens: number | null;
+          chat_id: string;
+          citations: Json;
+          content: string;
+          created_at: string;
+          created_by: string | null;
+          id: number;
+          input_tokens: number | null;
+          notebook_id: string;
+          output_tokens: number | null;
+          role: string;
+          source_ids: string[] | null;
+        };
+        Insert: {
+          cache_read_tokens?: number | null;
+          chat_id: string;
+          citations?: Json;
+          content: string;
+          created_at?: string;
+          created_by?: string | null;
+          id?: never;
+          input_tokens?: number | null;
+          notebook_id: string;
+          output_tokens?: number | null;
+          role: string;
+          source_ids?: string[] | null;
+        };
+        Update: {
+          cache_read_tokens?: number | null;
+          chat_id?: string;
+          citations?: Json;
+          content?: string;
+          created_at?: string;
+          created_by?: string | null;
+          id?: never;
+          input_tokens?: number | null;
+          notebook_id?: string;
+          output_tokens?: number | null;
+          role?: string;
+          source_ids?: string[] | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'messages_chat_id_fkey';
+            columns: ['chat_id'];
+            isOneToOne: false;
+            referencedRelation: 'chats';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'messages_notebook_id_fkey';
             columns: ['notebook_id'];
             isOneToOne: false;
             referencedRelation: 'notebooks';
@@ -320,6 +415,29 @@ export type Database = {
       is_notebook_member: {
         Args: { min_role?: string; nb: string };
         Returns: boolean;
+      };
+      match_chunks: {
+        Args: {
+          p_candidates?: number;
+          p_embedding: string;
+          p_limit?: number;
+          p_notebook: string;
+          p_query: string;
+          p_source_ids?: string[];
+        };
+        Returns: {
+          char_end: number;
+          char_start: number;
+          chunk_id: number;
+          content: string;
+          fulltext_rank: number;
+          heading_path: string;
+          idx: number;
+          page: number;
+          score: number;
+          source_id: string;
+          vector_rank: number;
+        }[];
       };
       requeue_stale_jobs: { Args: { lease_seconds?: number }; Returns: number };
       retry_source: { Args: { p_source_id: string }; Returns: undefined };
