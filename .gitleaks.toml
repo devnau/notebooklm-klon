@@ -57,6 +57,7 @@ regexes = [
   # hineingerät, soll weiterhin gefunden werden.
   '''smoke-test-passwort-2026''',
   '''ingest-e2e-passwort-1234''',
+  '''rag-e2e-passwort-1234''',
   # Beispiel-Passwörter in der Dokumentation
   '''your-super-secret''',
 ]

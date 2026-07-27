@@ -26,6 +26,7 @@
     "prepare": "husky",
     "db:types": "bash scripts/gen-db-types.sh",
     "db:reset": "docker compose down -v && docker compose up -d --wait",
+    "rag:e2e": "node scripts/rag-e2e.mjs",
     "ingest:e2e": "node scripts/ingest-e2e.mjs",
     "smoke": "node scripts/smoke-test.mjs",
     "test:e2e": "playwright test",
