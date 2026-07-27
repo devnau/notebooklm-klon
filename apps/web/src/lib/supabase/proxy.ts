@@ -25,9 +25,22 @@ function isPublicPath(pathname: string): boolean {
  *  2. Die Cookies müssen sowohl auf dem Request- als auch auf dem
  *     Response-Objekt gesetzt werden. Nur am Response gesetzt, sehen
  *     nachgelagerte Server Components im selben Request noch das alte Token.
+ *
+ * @param requestHeaders Zusätzliche Kopfzeilen, die an den *Request* gehängt
+ *   werden — der Proxy gibt hier den CSP-Nonce mit. Sie müssen bei jedem
+ *   `NextResponse.next()` erneut mitgegeben werden, sonst verliert sie die
+ *   Neuzuweisung beim Setzen eines Cookies.
  */
-export async function updateSession(request: NextRequest): Promise<NextResponse> {
-  let response = NextResponse.next({ request });
+export async function updateSession(
+  request: NextRequest,
+  requestHeaders?: Headers,
+): Promise<NextResponse> {
+  const next = () =>
+    requestHeaders
+      ? NextResponse.next({ request: { headers: requestHeaders } })
+      : NextResponse.next({ request });
+
+  let response = next();
 
   const { NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY } = clientEnv();
 
@@ -43,7 +56,7 @@ export async function updateSession(request: NextRequest): Promise<NextResponse>
           for (const { name, value } of cookiesToSet) {
             request.cookies.set(name, value);
           }
-          response = NextResponse.next({ request });
+          response = next();
           for (const { name, value, options } of cookiesToSet) {
             response.cookies.set(name, value, options);
           }

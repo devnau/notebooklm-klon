@@ -1,0 +1,87 @@
+# Gateway für den Serverbetrieb.
+#
+# Anders als in der Entwicklung ist Caddy hier das einzige, was von aussen
+# erreichbar ist: Anwendung und Supabase-Dienste liegen dahinter im internen
+# Docker-Netz und haben keinen veröffentlichten Port.
+#
+# TLS besorgt Caddy selbst über Let's Encrypt — dafür müssen 80 und 443 offen
+# sein und PUBLIC_HOST auf einen Namen zeigen, der auf diesen Server auflöst.
+
+{
+	admin off
+	email {$ACME_EMAIL}
+	log {
+		level ERROR
+	}
+	servers {
+		# Hinter einem vorgelagerten Proxy (Cloud-Lastverteiler) müsste hier
+		# `trusted_proxies` stehen. Ohne einen solchen ist die Adresse der
+		# Gegenstelle die echte, und ein blind vertrauter X-Forwarded-For wäre
+		# eine Einladung, sich beim Rate-Limit als jemand anderes auszugeben.
+		client_ip_headers
+	}
+}
+
+{$PUBLIC_HOST} {
+	encode zstd gzip
+
+	header {
+		# HSTS mit Preload-Kennzeichnung. Zwei Jahre sind der übliche Wert;
+		# wer das zurücknehmen will, braucht Vorlauf — deshalb erst setzen,
+		# wenn TLS wirklich steht.
+		Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
+
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()"
+		Cross-Origin-Opener-Policy "same-origin"
+
+		# Verrät sonst Caddy und dessen Version.
+		-Server
+	}
+
+	# ── Supabase ──────────────────────────────────────────────────────────────
+	handle_path /auth/v1/* {
+		reverse_proxy auth:9999
+	}
+
+	handle_path /rest/v1/* {
+		reverse_proxy rest:3000
+	}
+
+	handle_path /storage/v1/* {
+		reverse_proxy storage:5000 {
+			# Ein 50-MB-Upload darf nicht am Zeitlimit scheitern.
+			transport http {
+				response_header_timeout 300s
+			}
+		}
+	}
+
+	handle_path /realtime/v1/* {
+		rewrite * /socket{uri}
+		reverse_proxy realtime:4000 {
+			# Realtime liest den Tenant aus der ersten Subdomain des Hosts.
+			# Ohne Umschreiben käme der echte Hostname an und der Dienst
+			# antwortete mit „Tenant not found".
+			header_up Host realtime-dev.localhost
+		}
+	}
+
+	# ── Anwendung ─────────────────────────────────────────────────────────────
+	handle {
+		reverse_proxy web:3000 {
+			# Der Chat streamt tokenweise. Ohne diese Einstellung puffert Caddy
+			# die Antwort und der Nutzer sieht minutenlang nichts, dann alles
+			# auf einmal — der ganze Zweck des Streamings wäre dahin.
+			flush_interval -1
+		}
+	}
+}
+
+# HTTP nur zur Weiterleitung. Der ACME-Challenge-Pfad wird von Caddy selbst
+# behandelt, bevor diese Regel greift.
+http://{$PUBLIC_HOST} {
+	redir https://{host}{uri} permanent
+}

@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from 'next';
+import { headers } from 'next/headers';
 import { Instrument_Sans, JetBrains_Mono, Source_Serif_4 } from 'next/font/google';
 import type { ReactNode } from 'react';
 
@@ -43,7 +44,30 @@ export const viewport: Viewport = {
   ],
 };
 
-export default function RootLayout({ children }: { readonly children: ReactNode }) {
+/**
+ * Alle Seiten werden je Anfrage gerendert.
+ *
+ * Nicht aus Bequemlichkeit, sondern weil die Content-Security-Policy einen
+ * **Nonce pro Anfrage** vergibt. Eine statisch vorgerenderte Seite trägt ihre
+ * Skripte fertig im HTML — mit dem Nonce vom Build-Zeitpunkt, also mit gar
+ * keinem. Der Browser blockiert dann jedes Skript, und die Seite erscheint,
+ * reagiert aber auf nichts.
+ *
+ * Aufgefallen ist das nur, weil der CSP-Test gegen den Produktionsbuild läuft:
+ * im Dev-Server wird ohnehin alles dynamisch gerendert, und dort war die Welt
+ * in Ordnung.
+ *
+ * Der Preis ist gering. Statisch waren bisher `/`, `/registrieren`,
+ * `/passwort-vergessen` und die Fehlerseite — vier kleine Formularseiten ohne
+ * Daten. Alles Übrige liegt hinter der Anmeldung und war nie statisch.
+ */
+export const dynamic = 'force-dynamic';
+
+export default async function RootLayout({ children }: { readonly children: ReactNode }) {
+  // Der Proxy legt den Nonce dieser Anfrage in eine eigene Kopfzeile, weil
+  // Server Components den CSP-Header nicht selbst auslesen können.
+  const nonce = (await headers()).get('x-nonce') ?? undefined;
+
   return (
     <html
       lang="de"
@@ -54,7 +78,7 @@ export default function RootLayout({ children }: { readonly children: ReactNode 
       className={`${instrumentSans.variable} ${sourceSerif.variable} ${jetbrainsMono.variable}`}
     >
       <body className="min-h-dvh antialiased">
-        <ThemeProvider>
+        <ThemeProvider nonce={nonce}>
           <a
             href="#main"
             className="sr-only-focusable bg-primary text-primary-foreground fixed top-3 left-3 z-50 rounded-md px-3 py-2 text-sm font-medium"
