@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { z } from 'zod';
 
+import { consumeRateLimit } from '@/lib/rate-limit';
 import { createClient } from '@/lib/supabase/server';
 
 /**
@@ -202,6 +203,9 @@ export async function requestArtifact(
 
   const { supabase } = await requireUser();
 
+  const quota = await consumeRateLimit(supabase, 'artifact');
+  if (!quota.ok) return { error: quota.message };
+
   // Berechtigung und Vorbedingungen prüft die Funktion selbst — sie läuft als
   // `security definer` und kann sich nicht auf RLS verlassen.
   const { data, error } = await supabase.rpc('request_artifact', {
@@ -236,6 +240,16 @@ export async function requestAudioOverview(
   if (!uuid.safeParse(notebookId).success) return { error: 'Ungültige Angabe.' };
 
   const { supabase } = await requireUser();
+
+  /*
+   * Eigenes, deutlich engeres Kontingent. Ein Audio-Überblick belegt den
+   * Worker minutenlang und kostet ein Vielfaches einer Textübersicht — fünf
+   * pro Stunde sind grosszügig und verhindern trotzdem, dass jemand die
+   * Warteschlange mit Aufträgen zustellt, die niemand hört.
+   */
+  const quota = await consumeRateLimit(supabase, 'audio');
+  if (!quota.ok) return { error: quota.message };
+
   const { data, error } = await supabase.rpc('request_audio_overview', {
     p_notebook: notebookId,
   });

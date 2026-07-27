@@ -11,6 +11,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 
 import { requireKey } from '@/lib/env';
+import { consumeRateLimit, recordUsage } from '@/lib/rate-limit';
 import { QueryEmbeddingError } from '@/lib/rag/embeddings';
 import { retrieve } from '@/lib/rag/retrieve';
 import { createClient } from '@/lib/supabase/server';
@@ -92,6 +93,16 @@ export async function POST(request: Request): Promise<Response> {
 
   if (!notebook) {
     return NextResponse.json({ error: 'Notebook nicht gefunden.' }, { status: 404 });
+  }
+
+  /*
+   * Das Kontingent wird geprüft, bevor irgendetwas Kostenpflichtiges läuft —
+   * also vor der Einbettung der Frage und lange vor dem Modellaufruf. Danach
+   * zu prüfen hiesse, für die abgelehnte Anfrage schon bezahlt zu haben.
+   */
+  const quota = await consumeRateLimit(supabase, 'chat');
+  if (!quota.ok) {
+    return NextResponse.json({ error: quota.message }, { status: 429 });
   }
 
   let apiKey: string;
@@ -274,6 +285,25 @@ export async function POST(request: Request): Promise<Response> {
           })
           .select('id')
           .single();
+
+        /*
+         * Der Verbrauch wird getrennt von der Nachricht verbucht. In
+         * `messages` stehen die Zahlen zur einzelnen Antwort; `llm_usage` ist
+         * die Auswertungssicht über alles, auch über Artefakte und
+         * Einbettungen. Eine einzige Tabelle für beides hiesse, jede
+         * Kostenauswertung über die Nachrichten zu führen — und die werden
+         * gelöscht, wenn jemand ein Notizbuch aufräumt.
+         */
+        await recordUsage(supabase, {
+          notebookId,
+          userId: user.id,
+          kind: 'chat',
+          model: 'claude-opus-5',
+          inputTokens: finalMessage.usage.input_tokens,
+          outputTokens: finalMessage.usage.output_tokens,
+          cacheReadTokens: finalMessage.usage.cache_read_input_tokens ?? 0,
+          cacheWriteTokens: finalMessage.usage.cache_creation_input_tokens ?? 0,
+        });
 
         controller.enqueue(line({ type: 'done', messageId: saved?.id ?? 0, citations }));
       } catch (error) {

@@ -530,6 +530,101 @@ await check('Notizbuch mit Artefakt lässt sich löschen', () => {
   return 'Kaskade über Artefakte, Notizen, Chats und Nachrichten';
 });
 
+console.log('\nKontingente');
+
+await check('Kontingent zählt herunter und lehnt dann ab', async () => {
+  assert(state.user, 'Voraussetzung fehlt: kein angemeldeter Nutzer');
+  const { token } = state.user;
+
+  const verbrauche = async (limit) => {
+    const response = await request(`${GATEWAY}/rest/v1/rpc/consume_rate_limit`, {
+      method: 'POST',
+      headers: {
+        apikey: ANON,
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ p_action: 'smoke', p_limit: limit, p_window_seconds: 3600 }),
+    });
+    return Number(response.text);
+  };
+
+  assert((await verbrauche(3)) === 2, 'erster Aufruf zählte nicht auf 2 herunter');
+  assert((await verbrauche(3)) === 1, 'zweiter Aufruf zählte nicht auf 1 herunter');
+  assert((await verbrauche(3)) === 0, 'dritter Aufruf zählte nicht auf 0 herunter');
+
+  const abgelehnt = await verbrauche(3);
+  assert(abgelehnt === -1, `vierter Aufruf ergab ${abgelehnt}, erwartet -1`);
+  return 'nach drei Aufrufen abgelehnt';
+});
+
+await check('gleichzeitige Aufrufe überziehen das Kontingent nicht', async () => {
+  /*
+   * Der Grund, warum Prüfen und Verbuchen dieselbe Anweisung sind. Zwei
+   * getrennte Aufrufe hätten ein Zeitfenster dazwischen: alle fragen „darf
+   * ich?", alle bekommen „ja", alle machen. Mit zehn gleichzeitigen Anfragen
+   * bei einem Limit von fünf muss genau fünfmal zugestimmt werden.
+   */
+  assert(state.user, 'Voraussetzung fehlt: kein angemeldeter Nutzer');
+  const { token } = state.user;
+
+  // Reste eines früheren Laufs entfernen: die Zählung unten prüft die absolute
+  // Zeilenzahl, und ein fehlgeschlagener Vorlauf würde sie verfälschen.
+  psql(`delete from public.rate_limit_events where action = 'smoke-parallel'`);
+
+  const ergebnisse = await Promise.all(
+    Array.from({ length: 10 }, () =>
+      request(`${GATEWAY}/rest/v1/rpc/consume_rate_limit`, {
+        method: 'POST',
+        headers: {
+          apikey: ANON,
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          p_action: 'smoke-parallel',
+          p_limit: 5,
+          p_window_seconds: 3600,
+        }),
+      }).then((response) => Number(response.text)),
+    ),
+  );
+
+  const gewaehrt = ergebnisse.filter((value) => value >= 0).length;
+  assert(gewaehrt === 5, `${gewaehrt} von 10 gewährt, erwartet 5`);
+
+  // Gegenprobe in der Datenbank: es dürfen nicht mehr Einträge entstanden sein,
+  // als gewährt wurden.
+  const eintraege = psql(
+    `select count(*) from public.rate_limit_events where action = 'smoke-parallel'`,
+  );
+  assert(eintraege === '5', `${eintraege} Einträge, erwartet 5`);
+  return '5 von 10 gewährt, keine Überziehung';
+});
+
+await check('Nutzer kann seine eigenen Zähler nicht löschen', async () => {
+  // Sonst wäre das Limit eine Empfehlung.
+  assert(state.user, 'Voraussetzung fehlt: kein angemeldeter Nutzer');
+
+  const response = await request(`${GATEWAY}/rest/v1/rate_limit_events?action=eq.smoke`, {
+    method: 'DELETE',
+    headers: {
+      apikey: ANON,
+      Authorization: `Bearer ${state.user.token}`,
+      Prefer: 'return=representation',
+    },
+  });
+
+  const geloescht = Array.isArray(response.json) ? response.json.length : 0;
+  assert(geloescht === 0, `Datenleck: ${geloescht} Zähler gelöscht`);
+
+  const verbleibend = psql(
+    `select count(*) from public.rate_limit_events where action = 'smoke'`,
+  );
+  assert(verbleibend !== '0', 'Zähler wurden trotzdem entfernt');
+  return 'Löschen abgewiesen';
+});
+
 console.log(
   failures === 0
     ? '\n✓ Alle Prüfungen bestanden.\n'

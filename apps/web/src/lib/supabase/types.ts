@@ -217,6 +217,53 @@ export type Database = {
           },
         ];
       };
+      llm_usage: {
+        Row: {
+          cache_read_tokens: number;
+          cache_write_tokens: number;
+          created_at: string;
+          id: number;
+          input_tokens: number;
+          kind: string;
+          model: string;
+          notebook_id: string | null;
+          output_tokens: number;
+          user_id: string | null;
+        };
+        Insert: {
+          cache_read_tokens?: number;
+          cache_write_tokens?: number;
+          created_at?: string;
+          id?: never;
+          input_tokens?: number;
+          kind: string;
+          model: string;
+          notebook_id?: string | null;
+          output_tokens?: number;
+          user_id?: string | null;
+        };
+        Update: {
+          cache_read_tokens?: number;
+          cache_write_tokens?: number;
+          created_at?: string;
+          id?: never;
+          input_tokens?: number;
+          kind?: string;
+          model?: string;
+          notebook_id?: string | null;
+          output_tokens?: number;
+          user_id?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'llm_usage_notebook_id_fkey';
+            columns: ['notebook_id'];
+            isOneToOne: false;
+            referencedRelation: 'notebooks';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       messages: {
         Row: {
           cache_read_tokens: number | null;
@@ -417,6 +464,27 @@ export type Database = {
         };
         Relationships: [];
       };
+      rate_limit_events: {
+        Row: {
+          action: string;
+          created_at: string;
+          id: number;
+          user_id: string;
+        };
+        Insert: {
+          action: string;
+          created_at?: string;
+          id?: never;
+          user_id: string;
+        };
+        Update: {
+          action?: string;
+          created_at?: string;
+          id?: never;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
       schema_migrations: {
         Row: {
           applied_at: string;
@@ -521,6 +589,10 @@ export type Database = {
           payload: Json;
         }[];
       };
+      consume_rate_limit: {
+        Args: { p_action: string; p_limit: number; p_window_seconds?: number };
+        Returns: number;
+      };
       generate_url_token: { Args: { byte_length?: number }; Returns: string };
       is_notebook_member: {
         Args: { min_role?: string; nb: string };
@@ -549,6 +621,7 @@ export type Database = {
           vector_rank: number;
         }[];
       };
+      prune_rate_limit_events: { Args: never; Returns: number };
       request_artifact: {
         Args: { p_kind: string; p_notebook: string };
         Returns: string;

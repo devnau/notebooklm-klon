@@ -12,6 +12,7 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { z } from 'zod';
 
+import { consumeRateLimit } from '@/lib/rate-limit';
 import { createClient } from '@/lib/supabase/server';
 
 /**
@@ -50,6 +51,22 @@ async function requireUser() {
  * `packages/shared`, damit die UI denselben Wert anzeigt, den der Server
  * durchsetzt.
  */
+/**
+ * Prüft Kontingent und Platz.
+ *
+ * Beides zusammen, weil beides dasselbe verhindert: dass jemand ein Notizbuch
+ * — oder den Worker — mit Material zustellt. Die Obergrenze je Notizbuch
+ * begrenzt den Bestand, das Kontingent die Geschwindigkeit.
+ */
+async function checkSourceLimits(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  notebookId: string,
+): Promise<string | null> {
+  const quota = await consumeRateLimit(supabase, 'upload');
+  if (!quota.ok) return quota.message;
+  return assertRoomForMoreSources(supabase, notebookId);
+}
+
 async function assertRoomForMoreSources(
   supabase: Awaited<ReturnType<typeof createClient>>,
   notebookId: string,
@@ -98,7 +115,7 @@ export async function registerUploadedSource(input: unknown): Promise<SourceActi
 
   const { supabase, user } = await requireUser();
 
-  const full = await assertRoomForMoreSources(supabase, notebookId);
+  const full = await checkSourceLimits(supabase, notebookId);
   if (full) return { error: full };
 
   const { data, error } = await supabase
@@ -162,7 +179,7 @@ export async function addUrlSource(
 
   const { supabase, user } = await requireUser();
 
-  const full = await assertRoomForMoreSources(supabase, parsed.data.notebookId);
+  const full = await checkSourceLimits(supabase, parsed.data.notebookId);
   if (full) return { error: full };
 
   const { data, error } = await supabase
@@ -214,7 +231,7 @@ export async function addPasteSource(
   const { supabase, user } = await requireUser();
   const { notebookId, title, text } = parsed.data;
 
-  const full = await assertRoomForMoreSources(supabase, notebookId);
+  const full = await checkSourceLimits(supabase, notebookId);
   if (full) return { error: full };
 
   /*
