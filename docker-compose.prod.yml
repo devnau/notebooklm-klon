@@ -1,0 +1,156 @@
+# Overlay für den Serverbetrieb.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# Was sich gegenüber der Entwicklung ändert:
+#
+#  * **Nur Caddy ist von aussen erreichbar.** Alle `ports`-Einträge der
+#    Basisdatei werden hier überschrieben, sodass Postgres, Storage, Realtime
+#    und die Sprachausgabe ausschliesslich im internen Netz liegen. Das ist
+#    kein Beiwerk: die Postgres-Portfreigabe der Entwicklung wäre auf einem
+#    Server mit öffentlicher Adresse ein offenes Scheunentor.
+#  * **Anwendung und Worker laufen als Container**, nicht auf dem Host.
+#  * **Ressourcengrenzen.** Die PDF-Verarbeitung und die Sprachausgabe sind die
+#    Speicherfresser; ohne Grenze nimmt ein Ausreisser die Datenbank mit.
+#
+# Voraussetzungen in der .env auf dem Server:
+#   PUBLIC_HOST=notizbuch.example.de
+#   ACME_EMAIL=admin@example.de
+#   PUBLIC_GATEWAY_URL=https://notizbuch.example.de
+#   PUBLIC_APP_URL=https://notizbuch.example.de
+#   NEXT_PUBLIC_SUPABASE_URL=https://notizbuch.example.de
+
+services:
+  db:
+    ports: !override []
+    deploy:
+      resources:
+        limits:
+          memory: 2g
+
+  auth:
+    ports: !override []
+
+  rest:
+    ports: !override []
+
+  storage:
+    ports: !override []
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+
+  realtime:
+    ports: !override []
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+
+  mailpit:
+    # In Produktion wird ein echter SMTP-Dienst verwendet; Mailpit fängt
+    # Nachrichten ab, statt sie zuzustellen. Auf null skaliert statt entfernt,
+    # damit die Basisdatei unverändert bleibt.
+    #
+    # Die Portfreigabe wird trotzdem aufgehoben: verlässt sich die Absicherung
+    # allein auf `replicas: 0`, genügt ein `docker compose up mailpit` beim
+    # Suchen eines Fehlers, und die Oberfläche mit allen abgefangenen Mails —
+    # darunter Passwort-Zurücksetzen-Links — steht offen im Netz.
+    ports: !override []
+    deploy:
+      replicas: 0
+
+  piper:
+    ports: !override []
+    deploy:
+      resources:
+        limits:
+          memory: 2g
+
+  kokoro:
+    ports: !override []
+    deploy:
+      resources:
+        limits:
+          # Kokoro hält das Modell im Speicher; darunter wird es beim ersten
+          # Aufruf vom Kernel abgeräumt.
+          memory: 4g
+
+  gateway:
+    volumes: !override
+      - ./docker/caddy/Caddyfile.prod:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    ports: !override
+      - '80:80'
+      - '443:443'
+      # QUIC. Ohne UDP fällt Caddy still auf HTTP/2 zurück — kein Fehler, aber
+      # auch kein HTTP/3.
+      - '443:443/udp'
+    environment:
+      PUBLIC_HOST: ${PUBLIC_HOST:?PUBLIC_HOST fehlt in .env}
+      ACME_EMAIL: ${ACME_EMAIL:?ACME_EMAIL fehlt in .env}
+    depends_on:
+      web:
+        condition: service_started
+
+  # ── Anwendung ───────────────────────────────────────────────────────────────
+  web:
+    build:
+      context: .
+      dockerfile: docker/web/Dockerfile
+      args:
+        # Diese beiden landen zur Build-Zeit im Browser-Bundle und müssen
+        # deshalb hier stehen — anders als alle übrigen, die beim Start gelesen
+        # werden. Der service_role-Key gehört nie hierher.
+        NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL:?fehlt in .env}
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY:?fehlt in .env}
+    image: nlm-web:local
+    container_name: nlm-web
+    restart: unless-stopped
+    depends_on:
+      storage-init:
+        condition: service_completed_successfully
+    environment:
+      NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      VOYAGE_API_KEY: ${VOYAGE_API_KEY}
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+
+  # ── Worker ──────────────────────────────────────────────────────────────────
+  worker:
+    build:
+      context: .
+      dockerfile: docker/worker/Dockerfile
+    image: nlm-worker:local
+    container_name: nlm-worker
+    restart: unless-stopped
+    depends_on:
+      storage-init:
+        condition: service_completed_successfully
+    environment:
+      # Intern, nicht über das Gateway: der Umweg über Caddy und TLS wäre für
+      # eine Verbindung innerhalb desselben Docker-Netzes reine Zusatzarbeit.
+      SUPABASE_INTERNAL_URL: http://gateway:8000
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      VOYAGE_API_KEY: ${VOYAGE_API_KEY}
+      PIPER_URL: http://piper:5000
+      KOKORO_URL: http://kokoro:8880
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    # Auf SIGTERM bringt der Worker den laufenden Job zu Ende. Die zehn
+    # Sekunden, die Docker standardmässig gibt, reichen dafür nicht — ein
+    # Import mitten im Schreiben hinterliesse eine Quelle mit halbem Index.
+    stop_grace_period: 120s
+    deploy:
+      resources:
+        limits:
+          # Die PDF-Verarbeitung ist der Speicherfresser: ein 200-Seiten-PDF
+          # liegt beim Parsen vollständig im Speicher.
+          memory: 3g

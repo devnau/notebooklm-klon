@@ -19,8 +19,9 @@ RUN npm ci
 # ── Build ────────────────────────────────────────────────────────────────────
 FROM node:24-slim AS build
 WORKDIR /repo
+# npm workspaces hebt alles nach oben: es gibt kein apps/web/node_modules, das
+# man kopieren könnte. Der erste Entwurf versuchte es und brach beim Bauen ab.
 COPY --from=deps /repo/node_modules ./node_modules
-COPY --from=deps /repo/apps/web/node_modules ./apps/web/node_modules
 COPY . .
 
 # @nlm/shared wird über sein exports-Feld aus dist/ geladen; ohne diesen

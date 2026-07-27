@@ -34,10 +34,16 @@ export async function proxy(request: NextRequest) {
 export const config = {
   matcher: [
     /*
-     * Alles außer statischen Dateien und Bildern. Der Session-Refresh soll bei
-     * jeder Navigation laufen, aber nicht bei jedem Icon — sonst vervielfachen
-     * sich die Auth-Anfragen ohne Nutzen.
+     * Alles außer statischen Dateien, Bildern und dem Health-Endpunkt.
+     *
+     * Der Session-Refresh soll bei jeder Navigation laufen, aber nicht bei
+     * jedem Icon — sonst vervielfachen sich die Auth-Anfragen ohne Nutzen.
+     *
+     * `api/health` muss draussen bleiben, weil der Healthcheck im Container
+     * keine Sitzung hat: der Proxy leitete ihn zur Anmeldung um, der Check
+     * bekäme eine 307 und meldete den Container als krank. Gefunden beim ersten
+     * echten Start des Images — im Dev-Betrieb ruft niemand /api/health auf.
      */
-    '/((?!_next/static|_next/image|favicon.ico|icon-.*|apple-touch-icon.*|brand/|illustrations/|backgrounds/|.*\\.(?:svg|png|jpg|jpeg|gif|webp|avif|ico|woff2?)$).*)',
+    '/((?!_next/static|_next/image|api/health|favicon.ico|icon-.*|apple-touch-icon.*|brand/|illustrations/|backgrounds/|.*\\.(?:svg|png|jpg|jpeg|gif|webp|avif|ico|woff2?)$).*)',
   ],
 };
