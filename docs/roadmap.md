@@ -195,10 +195,30 @@ fehl. Geprüft wird jetzt auf eine Umsatzangabe.
 - `AUDIO=1 npm run rag:e2e` prüft den ganzen Weg: 34 Beiträge, 3,4 MB MP3,
   297 Sekunden, beide Sprecher, aufsteigende Startzeiten
 
-**Offen:**
+**Offen (zurückgestellt, nicht vergessen):**
 
-- Audio-Cover (Asset 7) — Platzhalter steht
-- Stimmenauswahl in der Oberfläche; aktuell entscheidet die Notebook-Sprache
+- **Audio-Cover (Asset 7).** Platzhalter steht, Prompt ist noch zu schreiben —
+  1200 × 1200 für die Player-Karte.
+- **Stimmenauswahl in der Oberfläche.** Aktuell entscheidet die
+  Notebook-Sprache; die Stimmen stehen fest in `VOICES` (worker/src/lib/tts.ts)
+  und in der Positivliste von `docker/piper/server.py`. Beide müssten dann
+  zusammen erweitert werden — sie sind der Vertrag zwischen Worker und
+  Container.
+- **TTS-Container in ein Compose-Profil.** Sie starten heute bei jedem
+  `docker compose up` mit, und Kokoro lädt beim ersten Start ein Modell
+  (rund drei Minuten bis „healthy"). Wer keinen Audio-Überblick braucht,
+  wartet umsonst. Behelf bis dahin:
+  `docker compose up -d --scale piper=0 --scale kokoro=0`.
+- **`ffmpeg` ins Worker-Image.** Der Worker läuft heute auf dem Host, wo
+  ffmpeg vorausgesetzt wird. Sobald er in Phase 7 containerisiert wird, muss
+  es ins Image — sonst schlägt jeder Audio-Job mit `spawn ffmpeg ENOENT` fehl.
+- **Verwaiste Audiodateien beim Löschen eines Notizbuchs.** Die Kaskade räumt
+  `artifacts` ab, die MP3 im Bucket bleibt liegen. Dasselbe gilt schon für
+  hochgeladene Quellen. Ein Aufräumjob gehört zu Phase 7 (siehe dort); ein
+  Datenbank-Trigger scheidet aus, siehe Migration 0011.
+- **Kein Playwright-Test für den Player.** Er bräuchte einen fertig
+  gerenderten Überblick und damit mehrere Minuten Rechenzeit je Lauf. Geprüft
+  wird der Weg über `AUDIO=1 npm run rag:e2e`.
 
 **Ein Fehler, den diese Phase aufgedeckt hat — zum zweiten Mal derselbe Typ:**
 Migration 0010 brachte einen Trigger mit, der beim Löschen eines Artefakts die
@@ -210,7 +230,9 @@ aus, und eine ganz andere Operation lag am Boden. Gefunden hat es wieder nur
 der Ende-zu-Ende-Lauf, und zwar beim Aufräumen am Ende. Der Smoke-Test deckt
 die Kaskade jetzt über alle Kindtabellen ab.
 
-## Phase 6 — Teilen
+## Phase 6 — Teilen ⏸️ zurückgestellt
+
+Auf Wunsch vorerst ausgelassen; Phase 7 kommt vorgezogen.
 
 - Mitglieder einladen, Rollen ändern, entfernen
 - Links mit Token und Ablaufdatum
@@ -218,8 +240,39 @@ die Kaskade jetzt über alle Kindtabellen ab.
 - Nur-Lese-Modus für viewer, Presence im Chat
 - größte Erweiterung der Sicherheitssuite
 
+**Was das für den jetzigen Stand bedeutet.** Das Rollenmodell existiert
+vollständig — `notebook_members` mit owner, editor und viewer, alle Policies
+delegieren an `is_notebook_member`, und die Oberfläche prüft überall
+`hasAtLeastRole`. Nur gibt es keinen Weg, jemanden _einzuladen_: jedes
+Notizbuch hat genau ein Mitglied, seinen Eigentümer.
+
+Zwei Folgen, die man kennen sollte:
+
+1. **Die Angriffsfläche des Teilens gibt es noch nicht.** Kein Token, kein
+   öffentlicher Link, keine fremde Sitzung in einem fremden Notizbuch. Das ist
+   der angenehme Teil.
+2. **Die viewer-Pfade sind gebaut, aber nie im Einsatz.** Read-only-Zustände,
+   ausgeblendete Schaltflächen, der Playwright-Test „ein viewer bekommt keine
+   Schaltfläche zum Hinzufügen" — sie prüfen bisher nur den Eigentümerfall.
+   Wenn Phase 6 kommt, sind das die ersten Stellen, die eine echte Prüfung
+   brauchen.
+
+Die Sicherheitssuite prüft die Rollentrennung heute schon auf Datenbankebene
+(fremder Nutzer sieht nichts, kann nichts schreiben). Was fehlt, ist der Fall
+„Mitglied mit zu geringer Rolle" — den gibt es ohne Einladungen nicht
+herzustellen.
+
 ## Phase 7 — Härtung und Betrieb
 
+- **Aufräumjob für verwaiste Dateien.** Beim Löschen eines Notizbuchs räumt
+  die Kaskade die Datenbank ab, im Storage bleiben Quelldateien, extrahierte
+  Texte und Audiodateien liegen. Ein Datenbank-Trigger scheidet aus — der
+  Storage-Dienst verbietet direktes Löschen aus seinen Tabellen und machte
+  damit einmal das Löschen ganzer Notizbücher unmöglich (Migration 0011). Der
+  Job gehört in den Worker: Objekte auflisten, gegen `sources` und `artifacts`
+  abgleichen, Verwaiste über die Storage-API entfernen. Das ist auch ein
+  Datenschutzthema — ein gelöschtes Notizbuch soll gelöscht sein.
+- **`ffmpeg` ins Worker-Image**, sobald der Worker containerisiert wird.
 - **Standalone-Server statt `next start`.** Die Anwendung baut mit
   `output: standalone`; `next start` warnt dabei ausdrücklich, dass das nicht
   vorgesehen ist, und liefert trotzdem aus. Für das Produktionsimage ist
