@@ -4,6 +4,10 @@ Ein selbst gehosteter NotebookLM-Klon: eigene Quellen hochladen und mit belegten
 Antworten durcharbeiten. Jede Aussage im Chat führt per Klick zur Textstelle, aus
 der sie stammt.
 
+> **Hinweis:** Dieses Projekt ist ein unabhängiges Lern- und Demonstrationsprojekt.
+> Es steht in keiner Verbindung zu Google und wird weder von Google entwickelt
+> noch unterstützt.
+
 Der Unterschied zu einem allgemeinen Chatbot ist das **Grounding**: Das Modell
 antwortet ausschließlich aus den hochgeladenen Quellen und markiert jede
 Sachaussage mit einem Zitat. Deckt das Material eine Frage nicht ab, sagt es das,
@@ -55,6 +59,13 @@ Sprachausgabe. Alles läuft in Docker auf einem einzelnen Server — es gibt
 keine Abhängigkeit von einem Managed-Dienst außer den beiden Modell-APIs.
 
 Wie die Teile zusammenspielen: [docs/architecture.md](docs/architecture.md).
+
+## Voraussetzungen und laufende Kosten
+
+Für den Betrieb werden Docker, Node.js 24 sowie eigene API-Zugänge für Anthropic
+und Voyage AI benötigt. Die Nutzung dieser APIs kann abhängig von Dokumentmenge,
+Fragen, Artefakten und Embeddings Kosten verursachen. Das Repository enthält
+keine API-Schlüssel und stellt keine kostenlosen Modellkontingente bereit.
 
 ## Schnellstart
 
@@ -122,6 +133,8 @@ Die CI prüft jeden Pull Request und Änderungen auf `main` mit:
 | [docs/operations.md](docs/operations.md) | Runbooks: Sichern, Wiederherstellen, Störungen |
 | [docs/adr/](docs/adr/) | Architekturentscheidungen samt Begründung |
 | [assets/PROMPTS.md](assets/PROMPTS.md) | Bild-Prompts für alle Grafiken |
+| [SECURITY.md](SECURITY.md) | Sicherheitslücken verantwortungsvoll melden |
+| [docs/public-release-checklist.md](docs/public-release-checklist.md) | Checkliste vor dem öffentlichen Release |
 
 ## Sicherheit
 
@@ -142,9 +155,11 @@ zwischen zwei Notebooks. Entsprechend liegt der Schwerpunkt der Tests:
 - Kontingente je Nutzer für alles, was Geld kostet, gezählt in der Datenbank
   statt im Prozessspeicher.
 
-Vollständig in [docs/security.md](docs/security.md). Ein Fund gehört nicht in ein
-öffentliches Issue — bitte an <dev@dennis-nau.de>.
+Vollständig in [docs/security.md](docs/security.md). Sicherheitslücken bitte
+nicht öffentlich melden, sondern gemäß [SECURITY.md](SECURITY.md).
 
 ## Lizenz
 
-MIT
+Dieses Projekt steht unter der [MIT-Lizenz](LICENSE). Dadurch darf der Code auch
+verändert, weitergegeben und kommerziell genutzt werden, solange der Copyright-
+und Lizenzhinweis erhalten bleibt.
