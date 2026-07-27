@@ -5,8 +5,10 @@ import { pino } from 'pino';
 
 import { generateArtifact, type ArtifactPayload } from './handlers/generate-artifact.js';
 import { ingestSource, type IngestPayload } from './handlers/ingest-source.js';
+import { renderAudio, type RenderAudioPayload } from './handlers/render-audio.js';
 import { loadConfig } from './lib/config.js';
 import { EmbeddingClient } from './lib/embeddings.js';
+import { TtsClient } from './lib/tts.js';
 
 /**
  * Der Job-Worker.
@@ -67,6 +69,11 @@ function anthropic(): Anthropic {
   anthropicClient ??= new Anthropic({ apiKey: config.ANTHROPIC_API_KEY });
   return anthropicClient;
 }
+
+const tts = new TtsClient({
+  piperUrl: config.PIPER_URL,
+  kokoroUrl: config.KOKORO_URL,
+});
 
 type ClaimedJob = {
   readonly job_id: number;
@@ -164,9 +171,16 @@ async function runJob(job: ClaimedJob): Promise<void> {
           logger: log,
         });
         break;
-      // render_audio folgt in Phase 5. Ein unbekannter Job wird als
-      // fehlgeschlagen markiert statt endlos wiederholt — sonst blockiert er
-      // die Warteschlange.
+      case 'render_audio':
+        await renderAudio(job.payload as unknown as RenderAudioPayload, {
+          supabase,
+          anthropic: anthropic(),
+          tts,
+          logger: log,
+        });
+        break;
+      // Ein unbekannter Job wird als fehlgeschlagen markiert statt endlos
+      // wiederholt — sonst blockiert er die Warteschlange.
       default:
         await finishJob(job.job_id, 'failed', `Unbekannter Job-Typ: ${job.kind}`);
         log.error('Unbekannter Job-Typ');

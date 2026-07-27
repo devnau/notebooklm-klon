@@ -179,12 +179,36 @@ fehl. Geprüft wird jetzt auf eine Umsatzangabe.
    der Seitenaufbau so träge, dass der Playwright-Lauf in der CI scheiterte.
    Jetzt laufen sie nebenläufig — derselbe Gewinn für jeden echten Aufruf.
 
-## Phase 5 — Audio-Überblick
+## Phase 5 — Audio-Überblick 🔨
 
-- TTS-Adapter: Piper für Deutsch, Kokoro für Englisch
+**Fertig:**
+
+- TTS-Adapter mit zwei Anbietern: Piper für Deutsch, Kokoro für Englisch
+- Eigene HTTP-Hülle um Piper (`docker/piper`), damit beide dasselbe Protokoll
+  sprechen
 - Dialogskript per Structured Output, zwei Sprecherrollen
-- ffmpeg: Zusammenschnitt, Pausen, Lautheitsnormalisierung
-- Player mit mitlaufendem Transkript
+- ffmpeg: Zusammenschnitt, Pausen, Angleichung der Abtastrate,
+  Lautheitsnormalisierung auf −16 LUFS
+- Player mit mitlaufendem Transkript; Klick auf einen Beitrag springt dorthin
+- Fortschritt live über Realtime, mit echter Beitragszahl statt Schätzung
+- 7 Tests gegen echtes ffmpeg
+- `AUDIO=1 npm run rag:e2e` prüft den ganzen Weg: 34 Beiträge, 3,4 MB MP3,
+  297 Sekunden, beide Sprecher, aufsteigende Startzeiten
+
+**Offen:**
+
+- Audio-Cover (Asset 7) — Platzhalter steht
+- Stimmenauswahl in der Oberfläche; aktuell entscheidet die Notebook-Sprache
+
+**Ein Fehler, den diese Phase aufgedeckt hat — zum zweiten Mal derselbe Typ:**
+Migration 0010 brachte einen Trigger mit, der beim Löschen eines Artefakts die
+MP3 aus `storage.objects` entfernen sollte. Der Storage-Dienst verbietet das
+ausdrücklich, und weil die Kaskade beim Löschen eines Notizbuchs auch die
+Artefakte mitnimmt, war damit **das Löschen ganzer Notizbücher kaputt** — nicht
+nur das Aufräumen. Genau wie beim Owner-Trigger in 0003 sah der Einzelfall gut
+aus, und eine ganz andere Operation lag am Boden. Gefunden hat es wieder nur
+der Ende-zu-Ende-Lauf, und zwar beim Aufräumen am Ende. Der Smoke-Test deckt
+die Kaskade jetzt über alle Kindtabellen ab.
 
 ## Phase 6 — Teilen
 

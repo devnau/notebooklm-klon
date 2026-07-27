@@ -416,6 +416,117 @@ async function main() {
     );
   }
 
+  // ── Audio-Überblick ──────────────────────────────────────────────────────
+  /*
+   * Läuft nur mit `AUDIO=1`: die Vertonung braucht auf CPU etwa so lange, wie
+   * die Aufnahme dauert, und das sind mehrere Minuten. Für den normalen Lauf
+   * wäre das eine unzumutbare Wartezeit; wenn am Audio-Weg etwas geändert
+   * wurde, ist es die einzige ehrliche Prüfung.
+   */
+  if (process.env.AUDIO === '1') {
+    console.log('\n→ Audio-Überblick (dauert einige Minuten)');
+
+    const response = await fetch(`${GATEWAY}/rest/v1/rpc/request_audio_overview`, {
+      method: 'POST',
+      headers: {
+        apikey: ANON,
+        Authorization: `Bearer ${session.access_token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ p_notebook: notebookId }),
+    });
+    const audioId = (await response.text()).replace(/"/g, '').trim();
+
+    if (!/^[0-9a-f-]{36}$/.test(audioId)) {
+      check(
+        'Audio: angefordert',
+        false,
+        `HTTP ${response.status}: ${audioId.slice(0, 200)}`,
+      );
+    } else {
+      const deadline = Date.now() + 1_800_000;
+      let status = '';
+      let lastReport = '';
+      while (Date.now() < deadline) {
+        const row = psql(`
+          select status || '|' || coalesce((payload->>'renderedTurns'), '-')
+                 || '/' || coalesce(jsonb_array_length(payload->'turns')::text, '-')
+          from public.artifacts where id = '${audioId}';
+        `);
+        status = row.split('|')[0] ?? '';
+        if (row !== lastReport) {
+          console.log(`    ${row}`);
+          lastReport = row;
+        }
+        if (status === 'ready' || status === 'failed') break;
+        await sleep(10_000);
+      }
+
+      if (status !== 'ready') {
+        const detail = psql(
+          `select coalesce(error, '(ohne Meldung)') from public.artifacts where id = '${audioId}';`,
+        );
+        check('Audio: erzeugt', false, `Status ${status}: ${detail}`);
+      } else {
+        const payload = JSON.parse(
+          psql(`select payload::text from public.artifacts where id = '${audioId}';`),
+        );
+        const storagePath = psql(
+          `select storage_path from public.artifacts where id = '${audioId}';`,
+        );
+
+        check(
+          'Audio: Skript hat mehrere Beiträge',
+          (payload.turns?.length ?? 0) >= 6,
+          `${payload.turns?.length ?? 0} Beiträge`,
+        );
+        check(
+          'Audio: beide Sprecher kommen vor',
+          new Set((payload.turns ?? []).map((t) => t.speaker)).size === 2,
+        );
+        check(
+          'Audio: Startzeiten passen zur Beitragszahl',
+          (payload.offsets?.length ?? 0) === (payload.turns?.length ?? 0),
+        );
+        check(
+          'Audio: Startzeiten steigen an',
+          (payload.offsets ?? []).every(
+            (value, index, all) => index === 0 || value > all[index - 1],
+          ),
+        );
+
+        /*
+         * Der Prüfpunkt, der zählt: die Datei liegt im Bucket, ist eine MP3 und
+         * hat die angegebene Spielzeit. Ein Artefakt auf 'ready' ohne
+         * abspielbare Datei wäre das Schlimmste — die Oberfläche zeigte einen
+         * Player, der nichts tut.
+         */
+        const audioResponse = await fetch(
+          `${GATEWAY}/storage/v1/object/audio/${storagePath}`,
+          { headers: { Authorization: `Bearer ${SERVICE}`, apikey: SERVICE } },
+        );
+        const bytes = Buffer.from(await audioResponse.arrayBuffer());
+        check(
+          'Audio: Datei im Bucket',
+          audioResponse.ok && bytes.length > 10_000,
+          `${Math.round(bytes.length / 1024)} kB`,
+        );
+
+        // ID3-Kennung oder MPEG-Rahmensynchronisation am Dateianfang.
+        const istMp3 =
+          bytes.subarray(0, 3).toString('latin1') === 'ID3' ||
+          (bytes[0] === 0xff && (bytes[1] & 0xe0) === 0xe0);
+        check('Audio: Datei ist eine MP3', istMp3, bytes.subarray(0, 4).toString('hex'));
+
+        check(
+          'Audio: Spielzeit plausibel',
+          payload.durationSeconds > 20,
+          `${payload.durationSeconds} s`,
+        );
+      }
+    }
+  }
+
   console.log('\n→ Aufräumen ...');
   psql(`delete from public.notebooks where id = '${notebookId}';`);
   psql(`delete from auth.users where email = '${EMAIL}';`);

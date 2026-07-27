@@ -480,6 +480,56 @@ await check('Nachrichten sind unveränderlich', async () => {
   return 'auch der Eigentümer kann nicht ändern';
 });
 
+await check('Notizbuch mit Artefakt lässt sich löschen', () => {
+  /*
+   * Die zweite Auflage desselben Fehlers: ein Trigger, der beim Löschen eines
+   * Artefakts die Audiodatei aus storage.objects entfernen wollte. Der
+   * Storage-Dienst verbietet das, und weil die Kaskade beim Löschen eines
+   * Notizbuchs auch die Artefakte mitnimmt, war damit das Löschen ganzer
+   * Notizbücher kaputt — nicht nur das Aufräumen.
+   *
+   * Beim ersten Mal (0003, Owner-Trigger) hat es der E2E-Lauf gefunden, beim
+   * zweiten Mal (0010) der Ende-zu-Ende-Lauf des Audio-Wegs. Diese Prüfung
+   * schliesst die Lücke: sie deckt die Kaskade über alle Kindtabellen ab.
+   */
+  const userId = psql('select id from auth.users limit 1');
+  assert(/^[0-9a-f-]{36}$/.test(userId), 'kein Testnutzer vorhanden');
+
+  const notebookId =
+    psql(`
+    insert into public.notebooks (title, owner_id)
+    values ('Kaskade mit Artefakt', '${userId}')
+    returning id
+  `).split('\n')[0] ?? '';
+  assert(/^[0-9a-f-]{36}$/.test(notebookId), `unerwartete ID: "${notebookId}"`);
+
+  psql(`
+    insert into public.artifacts (notebook_id, kind, status, storage_path)
+    values ('${notebookId}', 'audio', 'ready', '${notebookId}/probe.mp3')
+  `);
+  psql(`
+    insert into public.notes (notebook_id, title, content)
+    values ('${notebookId}', 'Probe', 'Inhalt')
+  `);
+  const chatId =
+    psql(`
+    insert into public.chats (notebook_id, title) values ('${notebookId}', 'Probe')
+    returning id
+  `).split('\n')[0] ?? '';
+  psql(`
+    insert into public.messages (chat_id, notebook_id, role, content)
+    values ('${chatId}', '${notebookId}', 'user', 'Frage')
+  `);
+
+  psql(`delete from public.notebooks where id = '${notebookId}'`);
+
+  const remaining = psql(
+    `select count(*) from public.notebooks where id = '${notebookId}'`,
+  );
+  assert(remaining === '0', 'Notizbuch liess sich nicht löschen');
+  return 'Kaskade über Artefakte, Notizen, Chats und Nachrichten';
+});
+
 console.log(
   failures === 0
     ? '\n✓ Alle Prüfungen bestanden.\n'

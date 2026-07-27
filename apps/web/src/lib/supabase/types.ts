@@ -553,6 +553,7 @@ export type Database = {
         Args: { p_kind: string; p_notebook: string };
         Returns: string;
       };
+      request_audio_overview: { Args: { p_notebook: string }; Returns: string };
       requeue_stale_jobs: { Args: { lease_seconds?: number }; Returns: number };
       retry_source: { Args: { p_source_id: string }; Returns: undefined };
       storage_notebook_id: { Args: { object_name: string }; Returns: string };

@@ -22,6 +22,7 @@ import { useEffect, useState, useTransition } from 'react';
 import { deleteArtifact, requestArtifact } from '@/app/(app)/notebooks/[id]/studio/actions';
 import { SourceViewer, type TextRange } from '@/components/sources/source-viewer';
 import { ArtifactView } from '@/components/studio/artifact-view';
+import { AudioOverview } from '@/components/studio/audio-overview';
 import { NotesSection, type NoteRow } from '@/components/studio/notes-section';
 import { Button } from '@/components/ui/button';
 import { createClient } from '@/lib/supabase/client';
@@ -140,6 +141,13 @@ export function StudioPanel({
           </ul>
         )}
       </section>
+
+      <AudioOverview
+        notebookId={notebookId}
+        artifact={byKind.get('audio') ?? null}
+        canEdit={canEdit}
+        hasReadySources={readySourceIds.length > 0}
+      />
 
       <NotesSection
         notebookId={notebookId}

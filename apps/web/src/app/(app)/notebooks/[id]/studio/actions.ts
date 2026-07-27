@@ -1,6 +1,6 @@
 'use server';
 
-import { GENERATED_ARTIFACT_KINDS } from '@nlm/shared';
+import { BUCKET_AUDIO, GENERATED_ARTIFACT_KINDS } from '@nlm/shared';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { z } from 'zod';
@@ -229,6 +229,62 @@ export async function requestArtifact(
   return typeof data === 'string' ? { saved: true, id: data } : { saved: true };
 }
 
+/** Stösst den Audio-Überblick an oder frischt ihn auf. */
+export async function requestAudioOverview(
+  notebookId: string,
+): Promise<StudioActionResult> {
+  if (!uuid.safeParse(notebookId).success) return { error: 'Ungültige Angabe.' };
+
+  const { supabase } = await requireUser();
+  const { data, error } = await supabase.rpc('request_audio_overview', {
+    p_notebook: notebookId,
+  });
+
+  if (error) {
+    const message =
+      error.code === '22023'
+        ? 'Für dieses Notizbuch ist noch keine Quelle verarbeitet.'
+        : error.code === '42501'
+          ? 'Dazu fehlt die Berechtigung.'
+          : 'Der Audio-Überblick konnte nicht angefordert werden.';
+    return { error: message };
+  }
+
+  revalidatePath(`/notebooks/${notebookId}`);
+  return typeof data === 'string' ? { saved: true, id: data } : { saved: true };
+}
+
+/**
+ * Kurzlebige Adresse auf die fertige MP3.
+ *
+ * Zehn Minuten, deutlich länger als bei den Quelltexten: der Browser lädt
+ * beim Spulen Teilbereiche nach, und eine abgelaufene Adresse mitten im Hören
+ * wäre ein Abbruch ohne erkennbaren Grund. Ein Überblick von zwanzig Minuten
+ * sollte sich am Stück hören lassen.
+ */
+export async function createAudioUrl(
+  artifactId: string,
+): Promise<{ url?: string; error?: string }> {
+  if (!uuid.safeParse(artifactId).success) return { error: 'Ungültige Angabe.' };
+
+  const { supabase } = await requireUser();
+
+  const { data: artifact } = await supabase
+    .from('artifacts')
+    .select('storage_path')
+    .eq('id', artifactId)
+    .maybeSingle();
+
+  if (!artifact?.storage_path) return { error: 'Zu diesem Überblick gibt es keine Datei.' };
+
+  const { data, error } = await supabase.storage
+    .from(BUCKET_AUDIO)
+    .createSignedUrl(artifact.storage_path, 600);
+
+  if (error || !data) return { error: 'Die Aufnahme liess sich nicht öffnen.' };
+  return { url: data.signedUrl };
+}
+
 export async function deleteArtifact(
   artifactId: string,
   notebookId: string,
@@ -236,9 +292,26 @@ export async function deleteArtifact(
   if (!uuid.safeParse(artifactId).success) return { error: 'Ungültige Angabe.' };
 
   const { supabase } = await requireUser();
-  const { error } = await supabase.from('artifacts').delete().eq('id', artifactId);
 
+  const { data: artifact } = await supabase
+    .from('artifacts')
+    .select('storage_path')
+    .eq('id', artifactId)
+    .maybeSingle();
+
+  const { error } = await supabase.from('artifacts').delete().eq('id', artifactId);
   if (error) return { error: 'Die Übersicht konnte nicht gelöscht werden.' };
+
+  /*
+   * Die Audiodatei danach, über die Storage-API. Ein Datenbank-Trigger wäre
+   * naheliegender, geht aber nicht: der Storage-Dienst verbietet das direkte
+   * Löschen aus seinen Tabellen. Ein Versuch in Migration 0010 machte dadurch
+   * das Löschen ganzer Notizbücher unmöglich, weil der Trigger während der
+   * Kaskade feuerte (0011 nimmt ihn zurück).
+   */
+  if (artifact?.storage_path) {
+    await supabase.storage.from(BUCKET_AUDIO).remove([artifact.storage_path]);
+  }
 
   revalidatePath(`/notebooks/${notebookId}`);
   return { saved: true };
