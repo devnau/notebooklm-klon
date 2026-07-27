@@ -26,9 +26,32 @@ test.describe('Sicherheits-Kopfzeilen', () => {
     expect(csp).toContain("base-uri 'self'");
     expect(csp).toContain("form-action 'self'");
 
-    // Der entscheidende Punkt: Skripte laufen nur mit Nonce.
+    // Der entscheidende Punkt: Skripte laufen nur mit Nonce. Das gilt in jeder
+    // Betriebsart.
     expect(csp).toMatch(/script-src [^;]*'nonce-[A-Za-z0-9+/=]+'/);
     expect(csp).not.toMatch(/script-src [^;]*'unsafe-inline'/);
+  });
+
+  test('der Produktionsbuild erlaubt kein unsafe-eval', async ({ page }) => {
+    /*
+     * Nur gegen den Produktionsbuild geprüft, und das ist keine Ausnahme,
+     * sondern der Punkt: React braucht `eval()` im Entwicklungsmodus für
+     * Fehler-Overlay und Hot Reload. Verbietet man es dort, erscheint die Seite,
+     * aber der Dev-Server verliert genau die Eigenschaften, wegen derer man ihn
+     * benutzt — was sich wie ein Absturz der Anwendung anfühlt und keiner ist.
+     *
+     * In der CI läuft der Produktionsbuild (siehe playwright.config.ts), lokal
+     * der Dev-Server. Deshalb hängt die Prüfung an dieser Unterscheidung und
+     * nicht an einer Vermutung über die Umgebung.
+     */
+    test.skip(
+      !process.env.CI,
+      'Läuft nur gegen den Produktionsbuild; lokal ist der Dev-Server aktiv.',
+    );
+
+    const response = await page.goto('/anmelden');
+    const csp = response?.headers()['content-security-policy'] ?? '';
+
     expect(csp).not.toMatch(/script-src [^;]*'unsafe-eval'/);
   });
 

@@ -25,7 +25,26 @@
  * `style-src-attr` liesse sich theoretisch trennen; solange Mermaid Stilblöcke
  * erzeugt, brächte das nichts.
  */
-export function contentSecurityPolicy(nonce: string, supabaseOrigin: string): string {
+/**
+ * @param entwicklung Im Dev-Betrieb wird `'unsafe-eval'` erlaubt.
+ *
+ * **Nicht aus Bequemlichkeit.** React braucht `eval()` im Entwicklungsmodus für
+ * seine Debugging-Werkzeuge — Fehler-Overlay, rekonstruierte Aufrufstapel, Hot
+ * Reload. Ohne die Erlaubnis erscheint die Seite, aber der Dev-Server verliert
+ * genau die Eigenschaften, wegen derer man ihn benutzt: ein Fehler zeigt kein
+ * Overlay, sondern nur eine CSP-Meldung in der Konsole. Das sieht aus wie ein
+ * Absturz der Anwendung und ist keiner.
+ *
+ * Im Produktionsbuild bleibt es aus. React verwendet `eval()` dort nicht, und
+ * `'unsafe-eval'` in einer ausgelieferten Richtlinie würde einen guten Teil
+ * ihres Zwecks aufheben. Der Unterschied ist geprüft: der E2E-Test läuft in der
+ * CI gegen den Produktionsbuild und besteht darauf, dass es dort fehlt.
+ */
+export function contentSecurityPolicy(
+  nonce: string,
+  supabaseOrigin: string,
+  entwicklung = false,
+): string {
   const directives = [
     `default-src 'self'`,
     /*
@@ -37,7 +56,7 @@ export function contentSecurityPolicy(nonce: string, supabaseOrigin: string): st
      * Ältere Browser ignorieren `'strict-dynamic'` und fallen auf `'self'`
      * zurück; deshalb steht es zusätzlich da.
      */
-    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'`,
+    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${entwicklung ? " 'unsafe-eval'" : ''}`,
     `style-src 'self' 'unsafe-inline'`,
     // `data:` für die Favicons und für SVG, das Mermaid erzeugt.
     `img-src 'self' data: blob:`,

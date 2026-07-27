@@ -14,7 +14,9 @@ import { updateSession } from '@/lib/supabase/proxy';
 export async function proxy(request: NextRequest) {
   const nonce = createNonce();
   const origin = new URL(clientEnv().NEXT_PUBLIC_SUPABASE_URL).origin;
-  const csp = contentSecurityPolicy(nonce, origin);
+  // `unsafe-eval` nur im Dev-Betrieb, weil React seine Debugging-Werkzeuge
+  // darauf stützt. Begründung in lib/security-headers.ts.
+  const csp = contentSecurityPolicy(nonce, origin, process.env.NODE_ENV !== 'production');
 
   /*
    * Der Header muss an der *Anfrage* hängen, damit Next den Nonce findet und
