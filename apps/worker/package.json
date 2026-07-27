@@ -9,6 +9,7 @@
     "start": "dotenv -e ../../.env -- tsx src/index.ts",
     "predev": "npm --prefix ../.. run build --workspace=@nlm/shared",
     "dev": "dotenv -e ../../.env -- tsx watch src/index.ts",
+    "cleanup": "dotenv -e ../../.env -- tsx src/cleanup-once.ts",
     "clean": "rm -rf dist *.tsbuildinfo"
   },
   "dependencies": {

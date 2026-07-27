@@ -26,6 +26,7 @@
     "prepare": "husky",
     "db:types": "bash scripts/gen-db-types.sh",
     "db:reset": "docker compose down -v && docker compose up -d --wait",
+    "cleanup:probe": "node scripts/cleanup-probe.mjs",
     "backup": "bash scripts/backup.sh",
     "restore:probe": "bash scripts/restore-probe.sh",
     "rag:e2e": "node scripts/rag-e2e.mjs",

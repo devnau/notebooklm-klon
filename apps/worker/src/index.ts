@@ -4,6 +4,7 @@ import { createClient } from '@supabase/supabase-js';
 import { pino } from 'pino';
 
 import { generateArtifact, type ArtifactPayload } from './handlers/generate-artifact.js';
+import { cleanupOrphans } from './handlers/cleanup.js';
 import { ingestSource, type IngestPayload } from './handlers/ingest-source.js';
 import { renderAudio, type RenderAudioPayload } from './handlers/render-audio.js';
 import { loadConfig } from './lib/config.js';
@@ -237,6 +238,26 @@ async function main(): Promise<void> {
       // Gelegentlich nach hängenden Jobs sehen.
       if (idleTicks % 60 === 0) {
         await supabase.rpc('requeue_stale_jobs', { lease_seconds: JOB_LEASE_SECONDS });
+      }
+
+      /*
+       * Aufräumen, wenn ohnehin nichts zu tun ist.
+       *
+       * Kein eigener Zeitplan und kein cron: der Job braucht keinen festen
+       * Zeitpunkt, nur gelegentliche Ausführung. Ihn in die Leerlaufschleife
+       * zu legen heisst, dass er nie mit echter Arbeit konkurriert — und dass
+       * es keinen zweiten Mechanismus gibt, der ausfallen kann.
+       *
+       * Bei zwei Sekunden Grundtakt und der Verlangsamung nach 30 Leerläufen
+       * kommt das etwa alle 25 Minuten vor.
+       */
+      if (idleTicks % 750 === 0) {
+        try {
+          await cleanupOrphans(supabase, logger);
+        } catch (error) {
+          // Ein fehlgeschlagenes Aufräumen darf den Worker nicht beenden.
+          logger.error({ err: error }, 'Aufräumen fehlgeschlagen');
+        }
       }
       continue;
     }
