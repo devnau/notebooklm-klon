@@ -9,7 +9,11 @@ antwortet ausschließlich aus den hochgeladenen Quellen und markiert jede
 Sachaussage mit einem Zitat. Deckt das Material eine Frage nicht ab, sagt es das
 statt zu raten.
 
-> **Status:** in Entwicklung. Der Fortschritt steht in [docs/roadmap.md](docs/roadmap.md).
+> **Status:** einsatzfähig für den Eigenbetrieb. Was fehlt und was
+> zurückgestellt ist, steht in [docs/roadmap.md](docs/roadmap.md) — vor allem:
+> **Teilen ist noch nicht gebaut.** Das Rollenmodell existiert vollständig, es
+> gibt nur keinen Weg, jemanden einzuladen; jedes Notizbuch hat genau ein
+> Mitglied.
 
 ## Funktionen
 
@@ -81,6 +85,9 @@ Details, Konventionen und wie man eine Migration schreibt:
 | [docs/data-model.md](docs/data-model.md)     | Tabellen, Beziehungen, RLS-Regeln                |
 | [docs/security.md](docs/security.md)         | Bedrohungsmodell, Berechtigungsmatrix, Secrets   |
 | [docs/development.md](docs/development.md)   | Lokales Setup, Tests, Migrationen, Konventionen  |
+| [docs/rag.md](docs/rag.md)                   | Chunking, Hybrid-Suche, Zitate, Prompt-Aufbau    |
+| [docs/deployment.md](docs/deployment.md)     | Server aufsetzen, Abnahmeliste, Aktualisieren    |
+| [docs/operations.md](docs/operations.md)     | Runbooks: Sichern, Wiederherstellen, Störungen   |
 | [docs/adr/](docs/adr/)                       | Architekturentscheidungen samt Begründung        |
 | [assets/PROMPTS.md](assets/PROMPTS.md)       | Bild-Prompts für alle Grafiken                   |
 
@@ -97,6 +104,11 @@ zwischen zwei Notebooks. Entsprechend liegt der Schwerpunkt der Tests:
   Redirect-Ketten).
 - Quellen-Inhalte gehen als Daten in den Prompt, klar abgegrenzt von
   Anweisungen; Prompt-Injection wird getestet.
+- Content-Security-Policy mit Nonce je Anfrage, geprüft gegen den
+  Produktionsbuild — dort, wo eine zu strenge Richtlinie die Anwendung
+  stillschweigend lähmt.
+- Kontingente je Nutzer für alles, was Geld kostet, gezählt in der Datenbank
+  statt im Prozessspeicher.
 
 Vollständig in [docs/security.md](docs/security.md). Ein Fund gehört nicht in ein
 öffentliches Issue — bitte an <dev@dennis-nau.de>.

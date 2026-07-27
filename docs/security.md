@@ -183,6 +183,69 @@ Dokumentinhalt ist Nutzereingabe und wird als solche behandelt:
 Vollständig verhindern lässt sich Injection nicht. Die Auslegung ist deshalb,
 den Schaden zu begrenzen: nichts im Chatpfad hat Nebenwirkungen.
 
+## Content-Security-Policy (Phase 7)
+
+Die Richtlinie steht im Proxy (`apps/web/src/proxy.ts`), nicht in der
+Caddy-Konfiguration. Der Grund ist ein **Nonce pro Anfrage**: Next.js gibt eigene
+Skripte inline aus, und ohne Nonce bliebe nur `'unsafe-inline'` — was die
+Richtlinie gegen genau die Angriffe wirkungslos macht, wegen derer man sie
+aufstellt. Ein statischer Header im Reverse Proxy kann das nicht leisten.
+
+```
+script-src 'self' 'nonce-…' 'strict-dynamic'
+style-src  'self' 'unsafe-inline'
+img-src    'self' data: blob:
+connect-src 'self' <supabase> <supabase als ws>
+object-src 'none'
+frame-ancestors 'none'
+form-action 'self'
+base-uri 'self'
+```
+
+**`unsafe-inline` bei `style-src` bleibt.** Zwei Stellen brauchen es und beide
+lassen sich nicht mit Nonce versorgen: React setzt `style`-Attribute für
+Fortschrittsbalken und Panelbreiten, Mermaid erzeugt beim Zeichnen eigene
+Stilblöcke. Inline-Styles sind eine deutlich kleinere Angriffsfläche als
+Inline-Skripte — sie können Daten abgreifen, aber keinen Code ausführen.
+
+**Anthropic und Voyage stehen nicht in `connect-src`.** Beide werden
+ausschliesslich vom Server gerufen. Stünden sie dort, wäre das ein Hinweis
+darauf, dass ein Schlüssel im Browser-Bundle gelandet ist.
+
+**Alle Seiten werden je Anfrage gerendert.** Eine statisch vorgerenderte Seite
+trägt ihre Skripte fertig im HTML — mit dem Nonce vom Build-Zeitpunkt, also mit
+gar keinem. Beim ersten Anlauf blockierte der Browser deshalb jedes Skript, und
+die Anwendung war unbenutzbar; sichtbar wurde das nur, weil der Test gegen den
+Produktionsbuild läuft (im Dev-Server wird ohnehin alles dynamisch gerendert).
+
+Geprüft in `tests/e2e/security-headers.spec.ts`: dass die Richtlinie streng ist,
+dass sich der Nonce je Anfrage ändert — **und dass die Anwendung darunter
+funktioniert.** Das Letzte ist das Wichtigste: eine zu strenge Richtlinie bricht
+nichts sichtbar, die Seite erscheint und reagiert auf nichts.
+
+## Kontingente (Phase 7)
+
+Alles, was Modellaufrufe verursacht, hat ein Kontingent je Nutzer und Stunde:
+Fragen, Uploads, Übersichten, Audio-Überblicke. Die Werte stehen in
+`packages/shared/src/limits.ts`.
+
+Gezählt wird **in der Datenbank**, nicht im Prozessspeicher. Ein Zähler im
+Speicher gilt pro Prozess; sobald die Anwendung zweimal läuft, hat jeder sein
+eigenes Limit, und aus 120 pro Stunde werden 240.
+
+`consume_rate_limit()` prüft und verbucht unter einer Transaktionssperre je
+Nutzer und Aktion. Die erste Fassung tat das ohne Sperre — bei zehn
+gleichzeitigen Aufrufen und einem Limit von fünf wurden **sieben gewährt**.
+Zählen und Einfügen sind zwei Anweisungen, und unter READ COMMITTED sieht jede
+ihren eigenen Snapshot. Geprüft im Smoke-Test mit zehn parallelen Aufrufen.
+
+Ein Nutzer kann seine eigenen Zähler nicht löschen: `rate_limit_events` hat
+keine Policy für `authenticated`, geschrieben wird nur über die Funktion.
+
+**Die Kontingente gelten pro Nutzer, nicht global.** Bei vielen Nutzern begrenzt
+sie niemand in der Summe; dafür braucht es ein Kontingent bei Anthropic und
+Voyage.
+
 ## Tests
 
 | Suite            | Wo                           | Prüft                                         |
