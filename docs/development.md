@@ -85,6 +85,28 @@ Fehlt es, schlagen die Tests in `apps/worker/tests/audio-mix.test.ts` mit
 `spawn ffmpeg ENOENT` fehl. Das ist gewollt: sie zu überspringen würde einen
 grünen Lauf vortäuschen, obwohl der Audio-Weg ungeprüft bleibt.
 
+## Immer `http://localhost:3000`, nie `https`
+
+Der Dev-Server hat kein Zertifikat. Ruft man die Anwendung einmal über `https`
+auf, merkt sich der Browser die Hochstufung — und lädt danach **auch über http**
+nichts mehr. Das sieht aus, als sei der Server abgestürzt, und die Ursache
+steckt im Browser.
+
+Wenn es passiert ist, hilft ein Zurücksetzen des Eintrags:
+
+- **Chrome, Edge:** `chrome://net-internals/#hsts` → unter _Delete domain
+  security policies_ `localhost` eintragen und löschen. Danach hart neu laden.
+- **Firefox:** Chronik öffnen, bei `localhost` Rechtsklick → _Diese Website
+  vergessen_.
+- **Safari:** Entwickler-Menü → _Website-Daten leeren_.
+
+Ein privates Fenster umgeht den Zustand ebenfalls.
+
+Die Anwendung tut nichts mehr dazu: `upgrade-insecure-requests` wird nur mit
+TLS gesetzt, HSTS nur von Caddy in Produktion. Der Zustand kann aber von einer
+anderen Anwendung stammen, die vorher auf `localhost` lief — HSTS gilt
+**portunabhängig für den ganzen Host**.
+
 ## Migrationen schreiben
 
 1. Neue Datei in `supabase/migrations/` mit der nächsten Nummer:

@@ -32,6 +32,43 @@ test.describe('Sicherheits-Kopfzeilen', () => {
     expect(csp).not.toMatch(/script-src [^;]*'unsafe-inline'/);
   });
 
+  test('der Dev-Server erzwingt kein https', async ({ page }) => {
+    /*
+     * `upgrade-insecure-requests` weist den Browser an, jede http-Anfrage auf
+     * https zu heben. In Produktion richtig; auf dem Dev-Server, der kein
+     * Zertifikat hat, ein Selbstschuss: hat der Browser die Anwendung einmal
+     * über https angesprochen, merkt er sich die Hochstufung und lädt danach
+     * gar nichts mehr — auch nicht über http. Von aussen sieht das aus, als sei
+     * der Server tot, und die Ursache steckt in einer Kopfzeile.
+     *
+     * Genau so ist es beim ersten lokalen Betrieb passiert.
+     */
+    test.skip(
+      Boolean(process.env.CI),
+      'Läuft nur gegen den Dev-Server; in der CI ist der Produktionsbuild aktiv.',
+    );
+
+    const response = await page.goto('/anmelden');
+    const csp = response?.headers()['content-security-policy'] ?? '';
+
+    expect(csp).not.toContain('upgrade-insecure-requests');
+    // Und schon gar kein HSTS: das gilt portunabhängig für den ganzen Host und
+    // würde jede andere Anwendung auf localhost mit lahmlegen.
+    expect(response?.headers()['strict-transport-security']).toBeUndefined();
+  });
+
+  test('der Produktionsbuild erzwingt https', async ({ page }) => {
+    test.skip(
+      !process.env.CI,
+      'Läuft nur gegen den Produktionsbuild; lokal ist der Dev-Server aktiv.',
+    );
+
+    const response = await page.goto('/anmelden');
+    const csp = response?.headers()['content-security-policy'] ?? '';
+
+    expect(csp).toContain('upgrade-insecure-requests');
+  });
+
   test('der Produktionsbuild erlaubt kein unsafe-eval', async ({ page }) => {
     /*
      * Nur gegen den Produktionsbuild geprüft, und das ist keine Ausnahme,

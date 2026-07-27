@@ -76,8 +76,23 @@ export function contentSecurityPolicy(
     `form-action 'self'`,
     // Doppelt zu X-Frame-Options, aber die moderne und genauere Variante.
     `frame-ancestors 'none'`,
-    `upgrade-insecure-requests`,
   ];
+
+  /*
+   * `upgrade-insecure-requests` nur mit TLS.
+   *
+   * Die Direktive weist den Browser an, jede http-Anfrage auf https zu heben.
+   * In Produktion ist das richtig; auf dem Dev-Server, der kein Zertifikat hat,
+   * ist es ein Selbstschuss: hat der Browser die Anwendung einmal über https
+   * angesprochen, merkt er sich die Hochstufung und lädt danach **nichts** mehr
+   * — auch nicht über http. Von aussen sieht das aus, als sei der Server tot.
+   *
+   * Genau so ist es passiert. Die Direktive gehört deshalb dorthin, wo es auch
+   * ein https gibt.
+   */
+  if (!entwicklung) {
+    directives.push('upgrade-insecure-requests');
+  }
 
   return directives.join('; ');
 }
