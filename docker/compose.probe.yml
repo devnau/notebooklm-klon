@@ -1,0 +1,34 @@
+# Overlay für die Restore-Probe.
+#
+# Die Basisdatei vergibt feste Containernamen (`nlm-db`, `nlm-auth`, …). Die
+# sind im Alltag praktisch — `docker compose logs` ohne Projektpräfix, kurze
+# `docker exec`-Aufrufe —, aber sie sind global eindeutig. Ein zweiter Stack
+# scheitert deshalb beim Start mit „container name is already in use", selbst
+# wenn er ein eigenes Compose-Projekt und eigene Volumes hat.
+#
+# `!reset` nimmt die Vorgabe zurück; Docker vergibt dann die üblichen Namen aus
+# Projekt und Dienst. Der Probe-Stack läuft damit neben der Installation, ohne
+# ihr in die Quere zu kommen.
+services:
+  db:
+    container_name: !reset null
+  migrate:
+    container_name: !reset null
+  auth:
+    container_name: !reset null
+  rest:
+    container_name: !reset null
+  storage:
+    container_name: !reset null
+  storage-init:
+    container_name: !reset null
+  realtime:
+    container_name: !reset null
+  gateway:
+    container_name: !reset null
+  mailpit:
+    container_name: !reset null
+  piper:
+    container_name: !reset null
+  kokoro:
+    container_name: !reset null

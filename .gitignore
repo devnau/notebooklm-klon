@@ -45,3 +45,6 @@ tmp/
 *.log
 npm-debug.log*
 logs/
+
+# Sicherungen bleiben lokal.
+backups/
