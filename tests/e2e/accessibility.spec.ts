@@ -40,6 +40,60 @@ test.describe('Barrierefreiheit', () => {
     expect(violations, JSON.stringify(violations, null, 2)).toEqual([]);
   });
 
+  test('Dialog „Quelle hinzufügen" ohne Verstöße', async ({ page }) => {
+    /*
+     * Die Reiterleiste ist von Hand gebaut (role="tablist" mit
+     * aria-selected/aria-controls). Genau bei solchen Konstruktionen fällt
+     * etwas aus — eine fehlende Verknüpfung sieht man nicht, aber ein
+     * Screenreader liest dann drei Schaltflächen ohne Zusammenhang.
+     */
+    await register(page, uniqueUser());
+    await createNotebook(page, 'Dialog-Prüfung');
+
+    await page
+      .getByRole('region', { name: 'Quellen' })
+      .filter({ visible: true })
+      .getByRole('button', { name: 'Quelle hinzufügen' })
+      .click();
+
+    for (const reiter of ['Datei', 'Adresse', 'Text']) {
+      await page.getByRole('tab', { name: reiter }).click();
+      const { violations } = await scan(page);
+      expect(violations, `${reiter}: ${JSON.stringify(violations, null, 2)}`).toEqual([]);
+    }
+  });
+
+  test('Studio-Spalte ohne Verstöße', async ({ page }) => {
+    // Die Studio-Spalte kam mit Phase 4 und 5 dazu: Übersichten mit
+    // aufklappbaren Karten, Notizen, Audio-Player. Bis dahin deckte der Scan
+    // der Arbeitsfläche einen Platzhalter ab.
+    await register(page, uniqueUser());
+    await createNotebook(page, 'Studio-Prüfung');
+
+    const studio = page.getByRole('region', { name: 'Studio' }).filter({ visible: true });
+    await expect(studio).toBeVisible();
+
+    const { violations } = await scan(page);
+    expect(violations, JSON.stringify(violations, null, 2)).toEqual([]);
+  });
+
+  test('neue Notiz: Formular ist beschriftet und bedienbar', async ({ page }) => {
+    await register(page, uniqueUser());
+    await createNotebook(page, 'Notiz-Prüfung');
+
+    const studio = page.getByRole('region', { name: 'Studio' }).filter({ visible: true });
+    await studio.getByRole('button', { name: 'Neu' }).click();
+
+    // Beide Felder müssen über ihre Beschriftung erreichbar sein — sie sind
+    // visuell versteckt, weil das Formular klein ist, und genau dann wird das
+    // Label gern vergessen.
+    await expect(studio.getByLabel('Titel der Notiz')).toBeVisible();
+    await expect(studio.getByLabel('Inhalt der Notiz')).toBeVisible();
+
+    const { violations } = await scan(page);
+    expect(violations, JSON.stringify(violations, null, 2)).toEqual([]);
+  });
+
   test('Sprunglink ist der erste fokussierbare Punkt und funktioniert', async ({
     page,
   }) => {

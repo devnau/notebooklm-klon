@@ -24,7 +24,7 @@ const light = {
   surface: { l: 1, c: 0, h: 0 },
   surfaceSunken: { l: 0.94, c: 0.005, h: 85 },
   foreground: { l: 0.19, c: 0.007, h: 70 },
-  mutedForeground: { l: 0.53, c: 0.009, h: 78 },
+  mutedForeground: { l: 0.51, c: 0.009, h: 78 },
   muted: { l: 0.94, c: 0.005, h: 85 },
   input: { l: 0.66, c: 0.009, h: 79 },
   borderStrong: { l: 0.66, c: 0.009, h: 79 },
@@ -98,6 +98,20 @@ describe('Kontrast im Light Mode', () => {
       light.background,
       CONTRAST_AA_TEXT,
     );
+    /*
+     * Diese Prüfung fehlte, und axe hat sie in Phase 7 nachgeliefert: die
+     * abgewählten Reiter im Dialog „Quelle hinzufügen" stehen als
+     * muted-foreground auf muted und kamen auf 4,43:1. Geprüft war bis dahin
+     * nur muted-foreground auf background und auf surface — beides deutlich
+     * heller. Eine Palette, die auf zwei von drei Untergründen passt, ist keine.
+     */
+    expectContrast(
+      'muted-foreground auf muted',
+      light.mutedForeground,
+      light.muted,
+      CONTRAST_AA_TEXT,
+    );
+
     expectContrast(
       'muted-foreground auf surface',
       light.mutedForeground,
@@ -198,10 +212,36 @@ describe('Kontrast im Dark Mode', () => {
       dark.background,
       CONTRAST_AA_TEXT,
     );
+    /*
+     * Diese Prüfung fehlte, und axe hat sie in Phase 7 nachgeliefert: die
+     * abgewählten Reiter im Dialog „Quelle hinzufügen" stehen als
+     * muted-foreground auf muted und kamen auf 4,43:1. Geprüft war bis dahin
+     * nur muted-foreground auf background und auf surface — beides deutlich
+     * heller. Eine Palette, die auf zwei von drei Untergründen passt, ist keine.
+     */
+    expectContrast(
+      'muted-foreground auf muted',
+      light.mutedForeground,
+      light.muted,
+      CONTRAST_AA_TEXT,
+    );
+
     expectContrast(
       'muted-foreground auf surface',
       dark.mutedForeground,
       dark.surface,
+      CONTRAST_AA_TEXT,
+    );
+
+    /*
+     * Dasselbe Paar wie im hellen Modus, wo es 4,43:1 waren und damit zu
+     * wenig. Im dunklen Modus passt es (5,00:1) — geprüft wird es
+     * trotzdem, denn die Token werden unabhängig voneinander angepasst.
+     */
+    expectContrast(
+      'muted-foreground auf muted',
+      dark.mutedForeground,
+      dark.muted,
       CONTRAST_AA_TEXT,
     );
   });
