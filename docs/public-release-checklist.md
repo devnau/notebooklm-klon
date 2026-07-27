@@ -7,14 +7,18 @@ Sichtbarkeit von privat auf öffentlich abgearbeitet.
 
 - [ ] CI auf dem aktuellen Stand von `main` vollständig erfolgreich
 - [ ] Secret-Scan über die vollständige Git-Historie erfolgreich
-- [ ] Keine echten `.env`-Dateien, Backups, Logs, Datenbank-Dumps oder Uploads im Repository
-- [ ] Keine API-Schlüssel, Tokens, Passwörter oder privaten URLs in Code, Dokumentation oder Tests
+- [ ] Keine echten `.env`-Dateien, Backups, Logs, Datenbank-Dumps oder Uploads im
+      Repository
+- [ ] Keine API-Schlüssel, Tokens, Passwörter oder privaten URLs in Code,
+      Dokumentation oder Tests
 - [ ] GitHub-Actions-Logs stichprobenartig auf sensible Ausgaben geprüft
-- [ ] Testdateien und Screenshots auf personenbezogene oder vertrauliche Daten geprüft
+- [ ] Testdateien und Screenshots auf personenbezogene oder vertrauliche Daten
+      geprüft
 - [ ] Commit-Autoren und veröffentlichte E-Mail-Adressen geprüft
 - [ ] Rechte an Code, Texten, Grafiken, Testdateien und sonstigen Assets geklärt
 - [ ] `LICENSE`, `README.md` und `SECURITY.md` geprüft
-- [ ] Bewusst bestätigt, dass bestehende Klone und Forks später nicht zuverlässig zurückgerufen werden können
+- [ ] Bewusst bestätigt, dass bestehende Klone und Forks später nicht zuverlässig
+      zurückgerufen werden können
 
 ## Empfohlener lokaler Secret-Scan
 
@@ -38,7 +42,8 @@ rotiert werden.
 - [ ] Direkte Pushes, Force-Pushes und Löschen von `main` blockieren
 - [ ] Pull Requests und erforderliche CI-Prüfungen für `main` verlangen
 - [ ] Repository-Beschreibung und Topics ergänzen
-- [ ] GitHub Secret Scanning und Dependabot Alerts prüfen beziehungsweise aktivieren
+- [ ] GitHub Secret Scanning und Dependabot Alerts prüfen beziehungsweise
+      aktivieren
 
 ## Empfohlene Topics
 
