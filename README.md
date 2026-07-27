@@ -41,14 +41,14 @@ setzt die vollständige Anwendung reproduzierbar auf.
 
 ## Funktionen
 
-| Bereich | Status | Was es tut |
-| --- | --- | --- |
-| **Quellen** | ✅ verfügbar | PDF, DOCX, Markdown, Textdateien, URLs und eingefügter Text. Inhalte werden extrahiert, strukturbewusst zerlegt und als Vektoren indexiert. |
-| **Chat** | ✅ verfügbar | Hybride Suche aus Vektor- und Volltexttreffern, Streaming-Antworten und klickbare Zitate für belegte Aussagen. |
-| **Notizen** | ✅ verfügbar | Eigene Markdown-Notizen und gespeicherte Antworten einschließlich ihrer Belege. |
-| **Studio** | ✅ verfügbar | Zusammenfassung, Lernleitfaden, FAQ, Zeitleiste, Briefing und Mindmap aus den ausgewählten Quellen. |
-| **Audio** | ✅ verfügbar | Zweistimmiger Dialog über die Quellen als MP3, lokal per TTS erzeugt. |
-| **Zusammenarbeit** | 🚧 vorbereitet | Rollenmodell für Owner, Editor und Viewer ist vorhanden. Einladungen und Freigabelinks fehlen noch. |
+| Bereich              | Status          | Was es tut                                                                                                                                                                  |
+| -------------------- | --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Quellen**           | ✅ verfügbar    | PDF, DOCX, Markdown, Textdateien, URLs und eingefügter Text. Inhalte werden extrahiert, strukturbewusst zerlegt und als Vektoren indexiert.                                  |
+| **Chat**              | ✅ verfügbar    | Hybride Suche aus Vektor- und Volltexttreffern, Streaming-Antworten und klickbare Zitate für belegte Aussagen.                                                              |
+| **Notizen**           | ✅ verfügbar    | Eigene Markdown-Notizen und gespeicherte Antworten einschließlich ihrer Belege.                                                                                             |
+| **Studio**            | ✅ verfügbar    | Zusammenfassung, Lernleitfaden, FAQ, Zeitleiste, Briefing und Mindmap aus den ausgewählten Quellen.                                                                         |
+| **Audio**             | ✅ verfügbar    | Zweistimmiger Dialog über die Quellen als MP3, lokal per TTS erzeugt.                                                                                                       |
+| **Zusammenarbeit**    | 🚧 vorbereitet  | Rollenmodell für Owner, Editor und Viewer ist vorhanden. Einladungen und Freigabelinks fehlen noch.                                                                         |
 
 ## Technik
 
@@ -122,19 +122,19 @@ Die CI prüft jeden Pull Request und Änderungen auf `main` mit:
 
 ## Dokumentation
 
-| Datei | Inhalt |
-| --- | --- |
-| [docs/architecture.md](docs/architecture.md) | Komponenten, Datenflüsse, warum es so gebaut ist |
-| [docs/data-model.md](docs/data-model.md) | Tabellen, Beziehungen, RLS-Regeln |
-| [docs/security.md](docs/security.md) | Bedrohungsmodell, Berechtigungsmatrix, Secrets |
-| [docs/development.md](docs/development.md) | Lokales Setup, Tests, Migrationen, Konventionen |
-| [docs/rag.md](docs/rag.md) | Chunking, Hybrid-Suche, Zitate, Prompt-Aufbau |
-| [docs/deployment.md](docs/deployment.md) | Server aufsetzen, Abnahmeliste, Aktualisieren |
-| [docs/operations.md](docs/operations.md) | Runbooks: Sichern, Wiederherstellen, Störungen |
-| [docs/adr/](docs/adr/) | Architekturentscheidungen samt Begründung |
-| [assets/PROMPTS.md](assets/PROMPTS.md) | Bild-Prompts für alle Grafiken |
-| [SECURITY.md](SECURITY.md) | Sicherheitslücken verantwortungsvoll melden |
-| [docs/public-release-checklist.md](docs/public-release-checklist.md) | Checkliste vor dem öffentlichen Release |
+| Datei                                                                    | Inhalt                                           |
+| ------------------------------------------------------------------------ | ------------------------------------------------ |
+| [docs/architecture.md](docs/architecture.md)                             | Komponenten, Datenflüsse, warum es so gebaut ist |
+| [docs/data-model.md](docs/data-model.md)                                 | Tabellen, Beziehungen, RLS-Regeln                |
+| [docs/security.md](docs/security.md)                                     | Bedrohungsmodell, Berechtigungsmatrix, Secrets   |
+| [docs/development.md](docs/development.md)                               | Lokales Setup, Tests, Migrationen, Konventionen  |
+| [docs/rag.md](docs/rag.md)                                               | Chunking, Hybrid-Suche, Zitate, Prompt-Aufbau    |
+| [docs/deployment.md](docs/deployment.md)                                 | Server aufsetzen, Abnahmeliste, Aktualisieren    |
+| [docs/operations.md](docs/operations.md)                                 | Runbooks: Sichern, Wiederherstellen, Störungen   |
+| [docs/adr/](docs/adr/)                                                   | Architekturentscheidungen samt Begründung        |
+| [assets/PROMPTS.md](assets/PROMPTS.md)                                   | Bild-Prompts für alle Grafiken                   |
+| [SECURITY.md](SECURITY.md)                                               | Sicherheitslücken verantwortungsvoll melden      |
+| [docs/public-release-checklist.md](docs/public-release-checklist.md)     | Checkliste vor dem öffentlichen Release          |
 
 ## Sicherheit
 
