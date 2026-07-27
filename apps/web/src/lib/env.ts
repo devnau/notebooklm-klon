@@ -56,6 +56,25 @@ export function clientEnv(): z.infer<typeof clientSchema> {
   return clientCache;
 }
 
+/**
+ * Ein Schlüssel, der zur Laufzeit wirklich gebraucht wird.
+ *
+ * ANTHROPIC_API_KEY und VOYAGE_API_KEY sind im Schema optional, damit `next
+ * build` ohne sie durchläuft — die CI baut die Anwendung, ohne je ein Modell
+ * aufzurufen. Verlangt werden sie erst dort, wo ohne sie nichts geht, und dann
+ * mit einer Meldung, die sagt, was zu tun ist.
+ */
+export function requireKey(name: 'ANTHROPIC_API_KEY' | 'VOYAGE_API_KEY'): string {
+  const value = serverEnv()[name];
+  if (!value) {
+    throw new Error(
+      `${name} fehlt. Der Schlüssel gehört in die .env im Projektwurzelverzeichnis ` +
+        'und wird nicht ins Repository eingecheckt.',
+    );
+  }
+  return value;
+}
+
 export function serverEnv(): z.infer<typeof serverSchema> {
   if (typeof window !== 'undefined') {
     throw new Error('serverEnv() darf nicht im Browser aufgerufen werden.');

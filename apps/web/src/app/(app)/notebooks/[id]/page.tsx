@@ -1,8 +1,9 @@
-import { notebookRoleSchema } from '@nlm/shared';
-import { MessageSquareQuote, Sparkles } from 'lucide-react';
+import { hasAtLeastRole, notebookRoleSchema, type Citation } from '@nlm/shared';
+import { Sparkles } from 'lucide-react';
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 
+import { ChatPanel, type ChatMessage } from '@/components/chat/chat-panel';
 import { NotebookHeader } from '@/components/notebooks/notebook-header';
 import { SourcesPanel, type SourceRow } from '@/components/sources/sources-panel';
 import { WorkspaceShell } from '@/components/layout/workspace-shell';
@@ -61,6 +62,39 @@ export default async function NotebookPage({ params }: Params) {
     .eq('notebook_id', id)
     .order('created_at', { ascending: false });
 
+  /*
+   * Die zuletzt bearbeitete Unterhaltung wird fortgesetzt. Bei jedem Aufruf
+   * eine neue anzulegen würde den Verlauf in unzusammenhängende Fragmente
+   * zerlegen — und der Verlauf ist es, der Rückfragen erst möglich macht.
+   */
+  const { data: chat } = await supabase
+    .from('chats')
+    .select('id')
+    .eq('notebook_id', id)
+    .order('updated_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const { data: history } = chat
+    ? await supabase
+        .from('messages')
+        .select('id, role, content, citations')
+        .eq('chat_id', chat.id)
+        .order('id')
+        .limit(100)
+    : { data: null };
+
+  const messages: ChatMessage[] = (history ?? []).map((message) => ({
+    id: message.id,
+    role: message.role === 'assistant' ? 'assistant' : 'user',
+    content: message.content,
+    // `citations` ist jsonb; die generierten Typen kennen nur `Json`. Die Form
+    // wird beim Schreiben in der Chat-Route festgelegt.
+    citations: (message.citations ?? []) as unknown as Citation[],
+  }));
+
+  const readyCount = (sources ?? []).filter((source) => source.status === 'ready').length;
+
   return (
     <>
       <NotebookHeader notebook={notebook} role={role} />
@@ -72,28 +106,18 @@ export default async function NotebookPage({ params }: Params) {
             initialSources={(sources ?? []) as SourceRow[]}
           />
         }
-        chat={<ChatPlaceholder />}
+        chat={
+          <ChatPanel
+            notebookId={id}
+            initialMessages={messages}
+            initialChatId={chat?.id ?? null}
+            canAsk={hasAtLeastRole(role, 'editor')}
+            hasReadySources={readyCount > 0}
+          />
+        }
         studio={<StudioPlaceholder />}
       />
     </>
-  );
-}
-
-/* Chat und Studio entstehen in Phase 3 und 4. Bis dahin steht hier, was
-   kommt — ein leerer Kasten würde wie ein Fehler wirken. */
-
-function ChatPlaceholder() {
-  return (
-    <div className="flex min-h-0 flex-1 items-center justify-center p-8">
-      <div className="max-w-md text-center">
-        <MessageSquareQuote className="text-border mx-auto size-10" aria-hidden />
-        <h2 className="mt-5 font-medium">Belegter Chat</h2>
-        <p className="text-muted-foreground mt-2 text-sm leading-relaxed">
-          Ab Phase 3: Fragen an die eigenen Quellen, Antwort im Streaming, jede Aussage mit
-          klickbarem Verweis auf die Textstelle.
-        </p>
-      </div>
-    </div>
   );
 }
 
